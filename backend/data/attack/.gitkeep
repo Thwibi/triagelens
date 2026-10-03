@@ -1,0 +1,3 @@
+# Bundled seed directories. The contents arrive with the ATT&CK import and the
+# bundled detection profiles; the directories themselves must exist so the
+# application can copy into them on first run.

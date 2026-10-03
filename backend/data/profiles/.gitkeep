@@ -1,0 +1,2 @@
+# Bundled detection profiles. Populated by the rule loader; kept in git so a
+# fresh checkout can start without network access.

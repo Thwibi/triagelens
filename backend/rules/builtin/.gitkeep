@@ -1,0 +1,2 @@
+# Built-in rules that ship with the application itself, as opposed to imported
+# Sigma content in ../sigma. The detection engine registers these in Phase 6.
