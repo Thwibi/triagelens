@@ -1,0 +1,28 @@
+# Normalise line endings in the repository, so the same commit behaves the same
+# way on every machine. Without this, core.autocrlf=true on Windows checks shell
+# scripts out with CRLF, and a CRLF shebang fails on Linux with
+# "bad interpreter: /bin/sh^M".
+
+* text=auto eol=lf
+
+# Shell scripts must stay LF: the shebang is only honoured on Unix line endings.
+*.sh text eol=lf
+
+# Windows scripts are the mirror image and are only ever run by PowerShell.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets are never touched.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.sqlite3 binary
+*.db binary
+
+# Lockfiles must not gain or lose a trailing newline in either direction.
+backend/requirements.lock text eol=lf
+frontend/package-lock.json text eol=lf

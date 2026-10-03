@@ -1,0 +1,48 @@
+# Python build and cache artefacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+frontend/node_modules/
+.vite/
+
+# Build output: generated from frontend/src by `make frontend-build`
+backend/app/static/
+
+# Runtime data: cases, sources, reports, logs and the SQLite database.
+# backend/data also holds bundled seed directories (attack/, profiles/), so the
+# runtime artefacts are listed individually rather than ignoring the tree.
+backend/data/triagelens.db
+backend/data/triagelens.db-shm
+backend/data/triagelens.db-wal
+backend/data/*.sqlite3
+backend/data/logs/
+backend/data/cases/
+backend/data/reports/
+backend/data/imports/
+backend/data/custom_rules/
+/data/
+
+# Local configuration and secrets
+config.local.toml
+*.local.toml
+.env
+.env.*
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
