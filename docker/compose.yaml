@@ -1,0 +1,73 @@
+# Compose file for a local production-like run.
+#
+#   scripts/compose.sh up --build       start on 127.0.0.1:8787
+#   scripts/compose.sh --profile pdf up include the optional PDF renderer
+#
+# The wrapper generates TRIAGELENS_TOKEN into docker/.env on first use, so the
+# token stays stable across restarts without being exported by hand.
+#
+# The app binds 0.0.0.0 *inside* the container so Docker's published port can
+# reach it: a process listening only on the container's own loopback is invisible
+# to `-p`, because the published port is forwarded to the container's IP. Binding
+# a non-loopback address is refused without an auth token, so one is required
+# here. Isolation comes from publishing on the host loopback, not from the
+# container's bind address.
+
+services:
+  triagelens:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        WITH_PDF: "0"
+    image: triagelens:local
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      # Cases, sources, reports and logs all live under this volume.
+      TRIAGELENS_DATA_DIR: /data
+      TRIAGELENS_LOGGING__LEVEL: INFO
+      TRIAGELENS_SERVER__HOST: 0.0.0.0
+      TRIAGELENS_SERVER__AUTH_TOKEN: ${TRIAGELENS_TOKEN:?run via scripts/compose.sh, or set TRIAGELENS_TOKEN}
+    volumes:
+      - triagelens-data:/data
+    restart: unless-stopped
+    healthcheck:
+      # The token is required: /api/health is behind bearer auth like every other
+      # route, and an unauthenticated probe returns 401.
+      test:
+        - CMD-SHELL
+        - >-
+          curl --fail --silent
+          -H "Authorization: Bearer ${TRIAGELENS_TOKEN}"
+          http://127.0.0.1:8787/api/health
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Optional variant with the WeasyPrint system libraries present. Start it with:
+  #   scripts/compose.sh --profile pdf up triagelens-pdf
+  #
+  # This still reports pdf_available=false: WeasyPrint is not a Phase 0 dependency,
+  # so the library is absent and the report endpoint answers 422 PDF_UNAVAILABLE.
+  triagelens-pdf:
+    profiles: ["pdf"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        WITH_PDF: "1"
+    image: triagelens:pdf
+    ports:
+      - "127.0.0.1:8788:8787"
+    environment:
+      TRIAGELENS_DATA_DIR: /data
+      TRIAGELENS_SERVER__HOST: 0.0.0.0
+      TRIAGELENS_SERVER__AUTH_TOKEN: ${TRIAGELENS_TOKEN:?run via scripts/compose.sh, or set TRIAGELENS_TOKEN}
+    volumes:
+      - triagelens-data:/data
+    restart: unless-stopped
+
+volumes:
+  triagelens-data:
