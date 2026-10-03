@@ -1,0 +1,71 @@
+# TriageLens configuration.
+#
+# Every key below is the built-in default. Environment variables of the form
+# TRIAGELENS_<SECTION>__<KEY> override the file, e.g.
+#
+#   TRIAGELENS_SERVER__PORT=9000
+#   TRIAGELENS_SERVER__ALLOWED_HOSTS=analyst-vm,10.0.0.5
+#   TRIAGELENS_STORAGE__DATA_DIR=/var/lib/triagelens
+#
+# List values accept a comma-separated string or a JSON array.
+#
+# The server refuses to start when [server].host is not a loopback address and
+# [server].auth_token is empty.
+
+[server]
+# Loopback only by default. A non-loopback host requires auth_token.
+host = "127.0.0.1"
+port = 8787
+# Required (non-empty) whenever host is not loopback. Never logged or stored.
+auth_token = ""
+# Extra names accepted in the HTTP Host header (DNS-rebinding defence).
+# "localhost", "127.0.0.1" and "::1" are always accepted, plus [server].host.
+allowed_hosts = []
+
+[storage]
+data_dir = "./data"
+# Roots that from-path import may read from. Empty means: the user home
+# directory plus <data_dir>/imports.
+allowed_import_roots = []
+# Overwrite originals once before unlinking on case deletion (best effort;
+# not guaranteed on SSD / CoW file systems).
+secure_delete = false
+
+[limits]
+max_upload_gb = 10
+max_line_bytes = 1048576
+max_events_per_source = 50000000
+max_archive_expansion_ratio = 100
+max_archive_total_gb = 50
+max_archive_depth = 3
+max_archive_members = 10000
+# 0 means cpu_count - 1.
+worker_processes = 0
+# Refuse to start ingesting when free disk drops below this fraction.
+min_free_disk_fraction = 0.05
+
+[detection]
+profile = "standard"
+auto_run_after_ingest = true
+max_sample_events_per_alert = 500
+rule_timeout_seconds = 120
+alert_group_window_minutes = 60
+
+[ioc]
+extract_private_ips = true
+decode_depth = 2
+
+[network]
+# When false the process must not open outbound sockets.
+allow_enrichment = false
+
+[ui]
+default_theme = "dark"
+
+[logging]
+level = "INFO"
+# Empty means <data_dir>/logs.
+log_dir = ""
+file_max_bytes = 20971520
+file_backup_count = 5
+console = true
