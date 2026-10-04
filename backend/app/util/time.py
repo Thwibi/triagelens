@@ -64,6 +64,13 @@ def utc_now_iso() -> str:
     return iso_utc(utc_now())
 
 
+#: Names that mean a fixed zero offset. They are resolved without ``zoneinfo``
+#: because UTC is not a zone: it is a constant. Relying on the system database
+#: for it makes every naive timestamp fail on a host with no tzdata installed,
+#: which includes every Windows box.
+_ZERO_OFFSET_NAMES = frozenset({"UTC", "GMT", "Z", "UTC+00:00", "UTC-00:00"})
+
+
 def localize(
     naive: datetime,
     tz: str,
@@ -74,9 +81,19 @@ def localize(
 
     ``ambiguous`` is ``raise`` (the default, so a DST fold is never resolved
     silently), ``earlier`` or ``later`` for the two readings of a repeated hour.
+
+    Raises:
+        ValueError: if ``tz`` is not a known timezone, or if ``naive`` falls in a
+            DST fold or gap and ``ambiguous`` is ``raise``.
     """
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+    if ambiguous not in {"raise", "earlier", "later"}:
+        raise ValueError("ambiguous must be 'raise', 'earlier' or 'later'")
+    if tz.strip().upper() in _ZERO_OFFSET_NAMES:
+        # No fold is possible at a constant offset, so there is nothing to
+        # disambiguate.
+        return naive.replace(tzinfo=UTC).astimezone(UTC)
     try:
         zone = ZoneInfo(tz)
     except ZoneInfoNotFoundError as exc:

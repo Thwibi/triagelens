@@ -3,6 +3,76 @@
 Each entry records a decision that is not obvious from the code, why it was
 made, and what it costs. Newest first. Dates are ISO-8601.
 
+## 2026-10-04 — Archive members are detected individually
+
+**Decision.** `intake_stream` detects every entry of `IntakeResult.files` and keeps
+the results in `IntakeResult.detections`, aligned by index. For a plain upload that
+is a single-element list holding the same object as `IntakeResult.detection`.
+
+**Why.** An archive is a container, not a log format: a ZIP of well-formed syslog
+files has no format of its own, and the records that will actually be parsed are its
+members. Detecting only the container reported the ZIP itself, so every member of a
+valid bundle looked unrecognized and the source went to `needs_input`. `detection`
+is kept as the container's own result because the source row records what was
+uploaded; `detection_for(member)` and `format_candidates()` serve the per-member and
+operator-facing cases, the latter collapsing duplicates so twenty identical members
+are one question rather than twenty.
+
+**Cost.** `detections` and `files` are parallel lists that a caller can desynchronise.
+They are compared with `strict=True` inside `detection_for`, which turns a mismatch
+into an error instead of a wrong answer.
+
+## 2026-10-04 — A recognized format with no parser is `needs_input`
+
+**Decision.** `DetectionResult.needs_input` is true when `log_type` is `None` **or**
+`parser_available` is false.
+
+**Why.** These are different situations with the same correct handling. An unknown
+type asks the operator to choose; a recognized type with no parser in this build
+cannot be fixed by choosing, but it still cannot be queued, because the parse job
+would fail on a parser that does not exist. Both leave a source parked in
+`needs_input` — a status spec 02 already defines for exactly this — where a person
+or a later build resolves it. Reporting `needs_input` false for an unbuildable EVTX
+would have sent it to a doomed job instead.
+
+**Cost.** `needs_input` no longer means "the type is unknown", so a caller that
+wants to distinguish the two must read `parser_available` or `reason` rather than
+infer it. The UI prompt has to word the unbuildable case differently, since offering
+a format list would be misleading.
+
+## 2026-10-04 — UTC is resolved without the timezone database
+
+**Decision.** `app/util/time.py:localize` treats `UTC`, `GMT`, `Z` and `UTC±00:00`
+as fixed zero offsets and returns without touching `zoneinfo`. `tzdata` is also
+pinned as a runtime dependency for every other zone.
+
+**Why.** `zoneinfo` finds no database on Windows unless `tzdata` is installed, so
+`ZoneInfo("UTC")` raised `ZoneInfoNotFoundError`. UTC is a constant, not a zone, and
+depending on a database to express a constant made it fail on the one platform that
+ships no database. The ECS profile declares `timezone: UTC`, so this broke every
+naive ECS timestamp: the timestamp was dropped and the record was stored with a null
+`ts_ms`, which is wrong evidence rather than a visible failure.
+
+**Cost.** Two mechanisms for the same idea, and a caller reading `localize` has to
+know the fixed-offset names are special-cased. A naive timestamp in a real IANA zone
+still depends on `tzdata` being installed, which is why it is pinned rather than
+left to the host.
+
+## 2026-10-04 — The event insert binds `raw`
+
+**Decision.** `INSERT_SQL` covers `EVENT_COLUMNS` plus `fields_json` and `raw`, and
+`NormalizedEvent.values()` appends the serialized `fields_json` then `raw`.
+
+**Why.** The `events` table declares `raw TEXT NOT NULL` with no default, so an
+INSERT that omits the column fails with a constraint error and stores nothing. The
+unit tests all passed against the old statement because none of them executed it.
+`tests/test_ingest_events.py` now runs the real statement against the real
+migration in an in-memory SQLite database, which is the only way this class of bug
+shows up: a column the dataclass forgot is invisible to a mocked database.
+
+**Cost.** The unit tests and the round-trip test now overlap slightly, and the
+round-trip test depends on the migration staying loadable without FTS5.
+
 ## 2026-10-03 — The migration runner owns `schema_version`
 
 **Decision.** `app/db/migrations.py` creates the `schema_version` table itself

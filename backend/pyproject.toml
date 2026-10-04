@@ -17,6 +17,9 @@ dependencies = [
     "PyYAML==6.0.3",
     "regex==2026.9.29",
     "lxml==6.1.3",
+    # zoneinfo has no database on Windows, so the IANA rules have to ship with
+    # the app: parsing a naive log timestamp in a case timezone needs them.
+    "tzdata==2026.5",
 ]
 
 [project.optional-dependencies]
@@ -92,10 +95,17 @@ ignore = [
 # S608 fires on f-string SQL. Every case interpolates a module-level constant or
 # an int already validated by config; no request value is ever concatenated.
 "app/db/*" = ["S608"]
+# S608 fires on INSERT_SQL, which interpolates only the module-level
+# EVENT_COLUMNS tuple. No request or record value ever reaches the SQL text.
+"app/ingest/events.py" = ["S608"]
 # PLC0415: local imports break import cycles between config, db and api layers.
 "app/*" = ["PLC0415"]
 # B008: Depends() in a default is the FastAPI idiom for dependency injection.
 "app/api/routers/*" = ["B008"]
+# DTZ007: parse_timestamp deliberately parses naive timestamps and then either
+# rejects them or localizes them with an explicit zone before anything is
+# stored. Making strptime require %z here would hide the real decision point.
+"app/ingest/normalize.py" = ["DTZ007"]
 # PT012 and SIM117: a nested `with` inside `pytest.raises` is the assertion.
 "tests/*" = [
     "S", "PLR2004", "ARG", "SLF", "PT011", "TRY", "RUF043", "PLC0415",

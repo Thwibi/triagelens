@@ -1,0 +1,26 @@
+name: elastic-ecs
+applies_when: { any_key: ["@timestamp", "ecs.version"] }
+timestamp: { path: "@timestamp", format: iso8601 }
+timezone: UTC
+fields:
+  host:                 "host.name"
+  user_name:            "user.name"
+  src_ip:               "source.ip"
+  src_port:             "source.port"
+  dst_ip:               "destination.ip"
+  dst_port:             "destination.port"
+  process_path:         "process.executable"
+  process_cmdline:      "process.command_line"
+  parent_process_path:  "process.parent.executable"
+  file_path:            "file.path"
+  url:                  "url.original"
+  http_method:          "http.request.method"
+  http_status:          "http.response.status_code"
+  user_agent:           "user_agent.original"
+  message:              "message"
+  event_id:             "event.code"
+  event_action:         "event.action"
+  event_outcome:        "event.outcome"
+category_rules:         # first match wins
+  - { when: { "event.category": "process" }, ls_category: process_creation }
+  - { when: { "event.category": "network" }, ls_category: network_connection }
