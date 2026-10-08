@@ -1,0 +1,78 @@
+title: Web SQL Injection Patterns
+id: 7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e20
+status: stable
+description: Common SQL injection payloads in the request target.
+logsource: { category: webserver }
+detection:
+  selection:
+    cs-uri-query|contains:
+      - "' or "
+      - "%27%20or%20"
+      - "union select"
+      - "union%20select"
+      - "union+select"
+      - "information_schema"
+      - "sleep("
+      - "benchmark("
+      - "extractvalue("
+      - "' --"
+      - "%27--"
+  condition: selection
+level: high
+falsepositives: [Security scanners run by the owner, search endpoints with SQL-like text]
+tags: [attack.initial-access, attack.t1190]
+---
+title: Web Path Traversal Attempt
+id: 7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e21
+status: stable
+logsource: { category: webserver }
+detection:
+  selection:
+    cs-uri-stem|contains:
+      - "../"
+      - "..%2f"
+      - "%2e%2e/"
+      - "%2e%2e%2f"
+      - "..\\"
+      - "/etc/passwd"
+      - "/windows/win.ini"
+  condition: selection
+level: high
+tags: [attack.initial-access, attack.t1190]
+---
+title: Known Scanner or Attack Tool User-Agent
+id: 7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e22
+status: stable
+logsource: { category: webserver }
+detection:
+  selection:
+    cs-user-agent|contains:
+      - sqlmap
+      - nikto
+      - nmap scripting engine
+      - masscan
+      - gobuster
+      - dirbuster
+      - wpscan
+      - nuclei
+      - acunetix
+      - nessus
+      - zgrab
+      - feroxbuster
+  condition: selection
+level: medium
+tags: [attack.reconnaissance, attack.t1595.002]
+---
+title: Web Shell-Like Request (script upload paths)
+id: 7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e23
+status: test
+logsource: { category: webserver }
+detection:
+  selection:
+    cs-method: POST
+    cs-uri-stem|endswith: [".php", ".jsp", ".aspx", ".asp"]
+    cs-uri-stem|contains: ["/uploads/", "/upload/", "/files/", "/images/", "/tmp/"]
+    sc-status: [200, 201]
+  condition: selection
+level: medium
+tags: [attack.persistence, attack.t1505.003]

@@ -1,0 +1,35 @@
+title: Firewall Deny (base)
+id: 7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e30
+status: stable
+logsource: { category: firewall }
+detection:
+  selection: { event_action: firewall_deny }
+  condition: selection
+level: informational
+tags: [attack.discovery, attack.t1046]
+---
+title: Port Scan - Many Destination Ports Denied From One Source
+id: 7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e31
+status: stable
+description: One source hit 20 or more distinct destination ports and was denied within one minute.
+correlation:
+  type: value_count
+  rules: [7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e30]
+  group-by: [src_ip]
+  timespan: 1m
+  condition: { gte: 20, field: dst_port }
+level: medium
+falsepositives: [Vulnerability scanners owned by the organization]
+tags: [attack.reconnaissance, attack.t1595.001, attack.discovery, attack.t1046]
+---
+title: Host Sweep - One Port Denied Across Many Destinations
+id: 7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e32
+status: stable
+correlation:
+  type: value_count
+  rules: [7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e30]
+  group-by: [src_ip, dst_port]
+  timespan: 1m
+  condition: { gte: 20, field: dst_ip }
+level: medium
+tags: [attack.reconnaissance, attack.t1595.001]

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from app.models.case import CaseCounts, CaseRecord
 from app.models.job import JobKind, JobRecord, JobStatus
+from app.models.rule import RuleRecord
 from app.models.setting import SettingRecord
 from app.models.source import SourceRecord, SourceStatus
 
@@ -18,6 +19,7 @@ __all__ = [
     "JobKind",
     "JobRecord",
     "JobStatus",
+    "RuleRecord",
     "SettingRecord",
     "SourceRecord",
     "SourceStatus",

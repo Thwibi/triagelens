@@ -1,0 +1,35 @@
+title: Windows Failed Logon (base)
+id: 7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e10
+status: stable
+logsource: { product: windows, service: security }
+detection:
+  selection: { EventID: 4625 }
+  condition: selection
+level: informational
+tags: [attack.credential-access, attack.t1110]
+---
+title: Password Spraying - Many Accounts From One Source
+id: 7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e11
+status: stable
+description: Failed logons for 10 or more distinct accounts from one source address within 10 minutes.
+correlation:
+  type: value_count
+  rules: [7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e10]
+  group-by: [IpAddress]
+  timespan: 10m
+  condition: { gte: 10, field: TargetUserName }
+level: high
+falsepositives: [Shared NAT gateways, misconfigured service accounts]
+tags: [attack.credential-access, attack.t1110.003]
+---
+title: Windows Brute Force - Many Failures Against One Account
+id: 7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e12
+status: stable
+correlation:
+  type: event_count
+  rules: [7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e10]
+  group-by: [TargetUserName]
+  timespan: 5m
+  condition: { gte: 15 }
+level: medium
+tags: [attack.credential-access, attack.t1110.001]

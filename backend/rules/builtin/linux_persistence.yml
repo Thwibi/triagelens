@@ -1,0 +1,29 @@
+title: Local User Account Created (Linux)
+id: 7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e40
+status: stable
+logsource: { product: linux, service: auth }
+detection:
+  selection: { event_action: user_added }
+  condition: selection
+level: medium
+falsepositives: [Legitimate administration]
+tags: [attack.persistence, attack.t1136.001]
+---
+title: Sudo Command Run As Root By Unexpected Shell Spawn
+id: 7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e41
+status: test
+logsource: { product: linux, service: auth }
+detection:
+  selection:
+    event_action: sudo_command
+    target_user_name: root
+    process_cmdline|contains:
+      - "/bin/bash"
+      - "/bin/sh"
+      - "su -"
+      - "chmod u+s"
+      - "chmod 4755"
+      - "visudo"
+  condition: selection
+level: medium
+tags: [attack.privilege-escalation, attack.t1548.003]

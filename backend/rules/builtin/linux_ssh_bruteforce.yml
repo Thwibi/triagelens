@@ -1,0 +1,51 @@
+title: SSH Failed Password (base)
+id: 7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e01
+status: stable
+description: Base rule feeding SSH brute-force correlation.
+logsource: { product: linux, service: sshd }
+detection:
+  selection:
+    event_action:
+      - ssh_failed_password
+      - ssh_invalid_user
+  condition: selection
+level: informational
+tags: [attack.credential-access, attack.t1110.001]
+---
+title: SSH Brute Force From Single Source
+id: 7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e02
+status: stable
+description: Ten or more failed SSH authentications from one source within five minutes.
+correlation:
+  type: event_count
+  rules: [7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e01]
+  group-by: [src_ip]
+  timespan: 5m
+  condition: { gte: 10 }
+level: high
+falsepositives: [Misconfigured automation, password-manager retries]
+tags: [attack.credential-access, attack.t1110.001]
+---
+title: SSH Successful Login After Failures From Same Source
+id: 7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e03
+status: stable
+description: A successful SSH login from a source that failed authentication within the previous ten minutes.
+correlation:
+  type: temporal_ordered
+  rules:
+    - 7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e01
+    - 7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e04
+  group-by: [src_ip]
+  timespan: 10m
+level: critical
+tags: [attack.initial-access, attack.t1078, attack.credential-access, attack.t1110]
+---
+title: SSH Accepted Login (base)
+id: 7b1e9a52-3c0d-4f0e-9d51-0a1b2c3d4e04
+status: stable
+logsource: { product: linux, service: sshd }
+detection:
+  selection: { event_action: ssh_accepted_login }
+  condition: selection
+level: informational
+tags: [attack.initial-access, attack.t1078]
