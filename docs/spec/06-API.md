@@ -135,6 +135,17 @@ Job       {id, case_id, kind, source_id, status, stage, progress, message, error
 | GET | `/rules/export` | zip of selected/all custom rules |
 | GET | `/rules/health` | counts and lists by problem class |
 
+### Mapping profiles
+Mapping profiles drive `generic_json`/`generic_csv` (spec 03 §6). Shipped profiles are read-only; user profiles live in a writable directory and may shadow a shipped one by name.
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/profiles` | every shipped and user profile: `{items:[{name, builtin, timestamp:{path,format}, timezone, default_category, applies_when:{any_key}, fields, category_rules}], total}` |
+| GET | `/profiles/{name}` | profile detail plus `yaml` source |
+| PUT | `/profiles/{name}` | `{yaml}` create or replace a user profile; the YAML `name` must equal `{name}`; a built-in name → 409 |
+| DELETE | `/profiles/{name}` | user profile only; built-in → 409; unknown → 404 |
+| POST | `/profiles/import` | multipart `file` (YAML), optional `name` override → 201 |
+| POST | `/profiles/preview` | `{sample, yaml, log_type?: generic_csv\|generic_json, limit?: 20}` → `{log_type, rows:[Event], errors:[{record_ref,reason}], row_count, error_count}`; parses the sample in a scratch file, never the case store |
+
 ### Reports
 | Method | Path | Notes |
 |---|---|---|
