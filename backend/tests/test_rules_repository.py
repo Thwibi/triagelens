@@ -11,6 +11,7 @@ from app.db.connection import Database
 from app.db.repositories.rules import RuleRepository
 from app.detect.rules import LoadedRule, load_rules
 from app.models.rule import KIND_CUSTOM, RULE_TYPE_DETECTION
+from app.util.hashing import hash_mapping
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 BUILTIN_DIR = BACKEND_ROOT / "rules" / "builtin"
@@ -219,3 +220,19 @@ class TestHealthCounts:
 
     def test_an_empty_catalogue_reports_zeroes(self, repo: RuleRepository) -> None:
         assert repo.health_counts() == {"ok": 0, "compile_error": 0, "unroutable": 0}
+
+
+class TestRulesetHash:
+    def test_an_empty_catalogue_hashes_the_empty_set(self, repo: RuleRepository) -> None:
+        assert repo.ruleset_hash() == hash_mapping({})
+
+    def test_hash_covers_only_enabled_rules(
+        self, repo: RuleRepository, builtin: list[LoadedRule]
+    ) -> None:
+        repo.upsert_many(builtin)
+        assert repo.ruleset_hash() == hash_mapping({rule.id: rule.sha256 for rule in builtin})
+        disabled = builtin[0].id
+        assert repo.set_enabled(disabled, enabled=False)
+        assert repo.ruleset_hash() == hash_mapping(
+            {rule.id: rule.sha256 for rule in builtin if rule.id != disabled}
+        )

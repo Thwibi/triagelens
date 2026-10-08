@@ -13,7 +13,10 @@ pattern cache keyed by text, (b) a rejection of rule patterns carrying the
 classic catastrophic-backtracking shapes (nested quantifiers, backrefs inside a
 quantified group), and (c) ``fullmatch`` semantics per the Sigma ``|re``
 modifier, which cannot anchor other regexes (so a ``|re`` rule never degrades
-to a raw ``LIKE``).
+to a raw ``LIKE``). The same verdict the fence reaches is exposed as
+:func:`pattern_problem`, so the engine can reject a hostile pattern once,
+before execution, with a reason to record in ``rule_runs`` instead of a
+silently non-matching filter.
 
 ``cidr_match`` is what the backend compiles ``|cidr`` into instead of an OR
 explosion; it also survives values SQLite cannot coerce to an IP by returning
@@ -52,11 +55,40 @@ _CACHE_LOCK = threading.Lock()
 _PATTERN_CACHE: dict[str, re.Pattern[str] | None] = {}
 
 
+def _size_or_shape_problem(pattern: str) -> str | None:
+    """Cheap empty/size/shape rejection; ``None`` when the pattern may run."""
+    if not pattern:
+        return "empty pattern"
+    if len(pattern) > _MAX_PATTERN_BYTES:
+        return f"pattern longer than {_MAX_PATTERN_BYTES} bytes"
+    if any(evil.search(pattern) for evil in _EVIL_PATTERNS):
+        return "catastrophic-backtracking shape"
+    return None
+
+
+def pattern_problem(pattern: str) -> str | None:
+    """Why ``pattern`` must not run against event data, or ``None`` if it may.
+
+    The engine calls this for every ``|re`` pattern before executing a rule
+    (spec 04 section 2): Python's ``re`` cannot be interrupted, so an
+    unusable pattern is rule health reported once with a reason - never a
+    silent non-match or a stalled worker. :func:`_compiled` reaches the same
+    verdict through :func:`_size_or_shape_problem`, so a pattern rejected
+    here can never run in ``regexp`` either.
+    """
+    problem = _size_or_shape_problem(pattern)
+    if problem is not None:
+        return problem
+    try:
+        re.compile(pattern)
+    except re.error as exc:
+        return f"does not compile: {exc}"
+    return None
+
+
 def _compiled(pattern: str) -> re.Pattern[str] | None:
     """Cached, validated pattern; ``None`` for anything unusable."""
-    if not pattern or len(pattern) > _MAX_PATTERN_BYTES:
-        return None
-    if any(evil.search(pattern) for evil in _EVIL_PATTERNS):
+    if _size_or_shape_problem(pattern) is not None:
         return None
     with _CACHE_LOCK:
         if pattern in _PATTERN_CACHE:
@@ -112,6 +144,7 @@ def register_udfs(connection: sqlite3.Connection) -> None:
 __all__ = [
     "REGEX_CACHE_SIZE",
     "cidr_match",
+    "pattern_problem",
     "regexp",
     "register_udfs",
 ]

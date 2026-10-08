@@ -14,7 +14,7 @@ from collections.abc import Sequence
 from app.db.connection import atomic
 from app.detect.rules import LoadedRule
 from app.models.rule import RuleRecord
-from app.util.hashing import canonical_json
+from app.util.hashing import canonical_json, hash_mapping
 from app.util.time import utc_now_iso
 
 _SELECT = "SELECT * FROM rules"
@@ -181,6 +181,17 @@ class RuleRepository:
             (int(enabled), utc_now_iso(), rule_id),
         )
         return cursor.rowcount > 0
+
+    def ruleset_hash(self) -> str:
+        """SHA-256 over the sorted file hashes of enabled rules (spec 01 9).
+
+        Stable regardless of file-system enumeration order; the hash of the
+        empty set is well defined, so reports always embed one.
+        """
+        rows = self._conn.execute(
+            "SELECT id, sha256 FROM rules WHERE enabled = 1 ORDER BY id"
+        ).fetchall()
+        return hash_mapping({str(row["id"]): str(row["sha256"]) for row in rows})
 
     def delete(self, rule_id: str) -> bool:
         """Remove one rule; the API restricts this to custom rules."""

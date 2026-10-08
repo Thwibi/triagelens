@@ -18,6 +18,8 @@ from fastapi import APIRouter, Depends
 from app.api.deps import get_database, get_settings
 from app.config import Settings
 from app.db.connection import Database
+from app.db.repositories.rules import RuleRepository
+from app.db.repositories.runs import attack_version
 from app.util.hashing import hash_mapping
 from app.version import APP_VERSION
 
@@ -39,30 +41,14 @@ class HealthResponse(TypedDict):
     pdf_available: bool
 
 
-def _attack_version(connection: sqlite3.Connection) -> str:
-    """ATT&CK bundle version, or empty until one is imported."""
-    try:
-        row = connection.execute(
-            "SELECT value FROM mitre_meta WHERE key = 'attack_version'"
-        ).fetchone()
-    except sqlite3.Error:
-        return ""
-    return str(row[0]) if row and row[0] is not None else ""
-
-
 def _ruleset_hash(connection: sqlite3.Connection) -> str:
-    """SHA-256 over the sorted hashes of enabled rules (spec 01 section 9).
-
-    Empty until the rule loader of Phase 6 populates ``rules``; the hash of the
-    empty set is well defined, so the field is always populated.
-    """
+    """SHA-256 over the sorted hashes of enabled rules (spec 01 section 9)."""
     try:
-        rows = connection.execute(
-            "SELECT id, sha256 FROM rules WHERE enabled = 1 ORDER BY id"
-        ).fetchall()
+        return RuleRepository(connection).ruleset_hash()
     except sqlite3.Error:
+        # Pre-migration databases have no rules table; the empty-set hash
+        # is well defined, so the field is always populated.
         return hash_mapping({})
-    return hash_mapping({str(row["id"]): str(row["sha256"]) for row in rows})
 
 
 def _pdf_available() -> bool:
@@ -81,14 +67,14 @@ def health(
     """Report process, database and storage health."""
     capabilities = database.capabilities
     with database.read_connection() as connection:
-        attack_version = _attack_version(connection)
-        ruleset_hash = _ruleset_hash(connection)
+        resolved_attack_version = attack_version(connection)
+        resolved_ruleset_hash = _ruleset_hash(connection)
     probe_path = settings.data_dir if settings.data_dir.exists() else Path.cwd()
     usage = shutil.disk_usage(probe_path)
     return HealthResponse(
         app_version=APP_VERSION,
-        attack_version=attack_version,
-        ruleset_hash=ruleset_hash,
+        attack_version=resolved_attack_version,
+        ruleset_hash=resolved_ruleset_hash,
         sqlite_version=capabilities.sqlite_version,
         fts5=capabilities.fts5,
         json1=capabilities.json1,
