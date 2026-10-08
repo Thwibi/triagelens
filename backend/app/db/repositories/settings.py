@@ -10,6 +10,7 @@ from __future__ import annotations
 import sqlite3
 from typing import Any
 
+from app.db.connection import atomic
 from app.models.setting import SettingRecord
 from app.util.time import utc_now_iso
 
@@ -61,18 +62,13 @@ class SettingsRepository:
         if not values:
             return []
         records = [SettingRecord(key=key, value=value) for key, value in sorted(values.items())]
-        self._conn.execute("BEGIN IMMEDIATE")
-        try:
+        with atomic(self._conn):
             for record in records:
                 self._conn.execute(
                     "INSERT INTO settings (key, value_json) VALUES (?, ?) "
                     "ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json",
                     (record.key, record.to_json()),
                 )
-        except BaseException:
-            self._conn.rollback()
-            raise
-        self._conn.commit()
         return records
 
     def seed_defaults(self, values: dict[str, Any]) -> list[SettingRecord]:

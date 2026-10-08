@@ -122,6 +122,12 @@ _INT_FIELDS: frozenset[str] = frozenset(
 #: constraint and no event is ever stored. Order matches the table.
 _EXTRA_COLUMNS: tuple[str, ...] = ("fields_json", "raw")
 
+#: Columns the IOC extractor never scans: identity, the original line and the
+#: raw-field blob (merged separately by :meth:`NormalizedEvent.ioc_fields`).
+_IOC_EXCLUDED: frozenset[str] = frozenset(
+    {"case_id", "source_id", "record_ref", "raw", "fields_json"}
+)
+
 #: Built once from the module-level column tuple, so no request value ever
 #: reaches the SQL text.
 INSERT_SQL = (
@@ -204,6 +210,31 @@ class NormalizedEvent:
         case view can show that something was lost.
         """
         return self.ts_ms is not None
+
+    def ioc_fields(self) -> dict[str, str]:
+        """The text fields the IOC extractor scans (spec 05 section 3).
+
+        Every string column except ``raw``: that line is what the columns were
+        built from, so scanning it too would record every indicator twice. The
+        ``fields_json`` blob is then merged in for keys the columns do not model,
+        skipping any value already seen so a field mapped into both places counts
+        once.
+        """
+        found: dict[str, str] = {}
+        for name in EVENT_COLUMNS:
+            if name in _IOC_EXCLUDED:
+                continue
+            value = getattr(self, name)
+            if isinstance(value, str) and value:
+                found[name] = value
+        seen = set(found.values())
+        for key, value in self.fields_json.items():
+            if not isinstance(value, str) or not value:
+                continue
+            if key in found or value in seen:
+                continue
+            found[key] = value
+        return found
 
     def split_url(self) -> None:
         """Split ``url`` into path and query on the first ``?`` (spec 02 section 1)."""

@@ -169,6 +169,30 @@ def connect(
     return connection
 
 
+@contextmanager
+def atomic(connection: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
+    """Run a unit of work as one transaction, or join the one already open.
+
+    Repositories use this instead of issuing ``BEGIN IMMEDIATE`` themselves. Two
+    reasons: it stays correct when called from inside a larger transaction (the
+    writer batches a source's counters, status and inventory together, and a
+    nested ``BEGIN`` raises "cannot start a transaction within a transaction" and
+    loses the outer unit of work), and it keeps transaction boundaries in one
+    place rather than scattered across repositories.
+    """
+    if connection.in_transaction:
+        yield connection
+        return
+    connection.execute("BEGIN IMMEDIATE")
+    try:
+        yield connection
+    except BaseException:
+        connection.rollback()
+        raise
+    else:
+        connection.commit()
+
+
 class Database:
     """Owns the single writer connection and hands out read connections."""
 
@@ -276,6 +300,7 @@ __all__ = [
     "SqliteCapabilities",
     "SqliteCapabilityError",
     "SqliteTooNewError",
+    "atomic",
     "connect",
     "probe_capabilities",
 ]

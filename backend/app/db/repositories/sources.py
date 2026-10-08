@@ -11,6 +11,7 @@ import sqlite3
 from collections.abc import Iterable, Sequence
 from typing import Any
 
+from app.db.connection import atomic
 from app.models.source import (
     InventoryRow,
     ParseErrorRecord,
@@ -267,8 +268,7 @@ class InventoryRepository:
             (log_type, channel or "", app_name or "", ls_category or "", int(count))
             for log_type, channel, app_name, ls_category, count in rows
         ]
-        self._conn.execute("BEGIN IMMEDIATE")
-        try:
+        with atomic(self._conn):
             self._conn.execute("DELETE FROM source_inventory WHERE source_id = ?", (source_id,))
             if payload:
                 self._conn.executemany(
@@ -277,10 +277,6 @@ class InventoryRepository:
                     "VALUES (?, ?, ?, ?, ?, ?)",
                     [(source_id, *row) for row in payload],
                 )
-        except BaseException:
-            self._conn.rollback()
-            raise
-        self._conn.commit()
         return len(payload)
 
     def for_case(self, case_id: str) -> list[tuple[str, str]]:

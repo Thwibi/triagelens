@@ -1,0 +1,26 @@
+# Default IOC allowlist (spec 05 section 5).
+#
+# These are infrastructure names that appear in benign logs and would otherwise
+# drown the IOC table. Matching indicators are still stored, with
+# is_allowlisted=1, and hidden in the UI unless "show allowlisted" is on; they are
+# excluded from exports and scoring by default.
+#
+# domain_suffix entries match the suffix itself and any subdomain of it.
+# domain entries match exactly one hostname.
+domain_suffix:
+  - schemas.microsoft.com
+  - schemas.xmlsoap.org
+  - www.w3.org
+  - purl.org
+  - ns.adobe.com
+  - localhost
+  - local
+  - example.com
+  - example.org
+  - example.net
+  - test
+  - invalid
+domain:
+  - windowsupdate.microsoft.com
+  - ctldl.windowsupdate.com
+  - crl.microsoft.com

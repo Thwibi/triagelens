@@ -35,11 +35,18 @@ from app.api.middleware import (
     SecurityHeadersMiddleware,
 )
 from app.api.routers import ROUTERS
+from app.api.routers.health import router as health_router
+from app.api.routers.websocket import router as websocket_router
 from app.config import Settings, load_settings
 from app.db.connection import Database, SqliteCapabilityError, SqliteTooNewError
 from app.db.migrations import apply_migrations
 from app.db.repositories.audit import AuditRepository
 from app.errors import ApiError, ErrorCode
+from app.jobs.manager import JobManager
+from app.jobs.progress import ProgressBus
+from app.jobs.tasks import IngestRunner
+from app.jobs.writer import DBWriter
+from app.models.job import JobKind
 from app.util.logging import configure_logging, get_logger
 from app.version import APP_NAME, APP_VERSION
 
@@ -147,6 +154,7 @@ def _startup(settings: Settings) -> Database:
     """Verify SQLite, open the database and bring the schema up to date."""
     database = Database(settings.db_path)
     database.capabilities.require()
+
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     settings.cases_dir.mkdir(parents=True, exist_ok=True)
     settings.reports_dir.mkdir(parents=True, exist_ok=True)
@@ -162,6 +170,56 @@ def _startup(settings: Settings) -> Database:
         },
     )
     return database
+
+
+def _build_ingest(
+    database: Database,
+    writer: DBWriter,
+    progress: ProgressBus,
+    manager: JobManager,
+    settings: Settings,
+) -> IngestRunner:
+    """Create the ingest runner and register it with the manager.
+
+    The runner is built here rather than per job so it owns one process manager
+    and one set of reader threads for the lifetime of the application.
+    """
+    runner = IngestRunner(
+        database=database,
+        writer=writer,
+        progress=progress,
+        submit=manager.submit,
+        max_line_bytes=settings.limits.max_line_bytes,
+    )
+    manager.register_handler(str(JobKind.INGEST), runner, on_cancel=runner.cancel)
+    return runner
+
+
+async def _start_jobs(app: FastAPI, database: Database, settings: Settings) -> None:
+    """Start the writer thread, the worker pool and the ingest handler."""
+    progress = ProgressBus()
+    writer = DBWriter(database)
+    manager = JobManager(progress, max_workers=settings.limits.worker_processes or None)
+    app.state.progress = progress
+    app.state.writer = writer
+    app.state.job_manager = manager
+    app.state.ingest = _build_ingest(database, writer, progress, manager, settings)
+    await manager.start()
+    app.state.ready = True
+    logger.info(
+        "workers ready",
+        extra={"worker_processes": settings.limits.worker_processes or "cpu_count - 1"},
+    )
+
+
+async def _shutdown(app: FastAPI) -> None:
+    """Stop in the reverse order of startup, so nothing writes to a closed database."""
+    app.state.ready = False
+    await app.state.job_manager.stop()
+    await app.state.ingest.shutdown()
+    app.state.writer.stop()
+    app.state.database.close()
+    logger.info("stopped", extra={"version": APP_VERSION})
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -204,15 +262,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.settings = resolved
         app.state.database = database
         app.state.audit = AuditRepository(database.writer)
-        app.state.ready = True
+        await _start_jobs(app, database, resolved)
         if not app.state.frontend_mounted:
             logger.warning(_STATIC_MISSING.format(path=resolved.static_dir))
         try:
             yield
         finally:
-            app.state.ready = False
-            database.close()
-            logger.info("stopped", extra={"version": APP_VERSION})
+            await _shutdown(app)
 
     app = FastAPI(
         title=APP_NAME,
@@ -225,11 +281,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = resolved
     app.state.ready = False
+    app.state.progress = ProgressBus()
+    app.state.job_manager = JobManager(app.state.progress)
 
     _register_exception_handlers(app)
 
+    # Health carries its own /api prefix in the router; everything else is
+    # mounted here under the same prefix, so a route cannot forget it.
+    app.include_router(health_router)
     for router in ROUTERS:
-        app.include_router(router)
+        if router is websocket_router:
+            # WebSocket routes are mounted explicitly because ``include_router``
+            # only copies HTTP routes: it drops ``@router.websocket`` handlers on
+            # the floor without complaining, and every subscription then 404s.
+            for route in router.routes:
+                app.add_api_websocket_route(
+                    f"{API_PREFIX}{route.path}", route.endpoint, name=route.name
+                )
+        else:
+            app.include_router(router, prefix=API_PREFIX)
 
     # Innermost first: each add_middleware wraps the previous one.
     app.add_middleware(BearerAuthMiddleware, settings=resolved)
