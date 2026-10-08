@@ -211,7 +211,7 @@ def _load_document(
     compile_error: str | None = None
     try:
         if rule_type == RULE_TYPE_CORRELATION:
-            parsed = SigmaCorrelationRule.from_dict(document)
+            parsed = SigmaCorrelationRule.from_dict(_without_generate(document))
         else:
             parsed = SigmaRule.from_dict(document)
     except Exception as exc:
@@ -246,6 +246,20 @@ def _load_document(
         route=route,
         sigma_rule=parsed,
     )
+
+
+def _without_generate(document: dict[str, Any]) -> dict[str, Any]:
+    """The document without the engine's ``generate`` extension key.
+
+    ``correlation.generate`` (spec 04 section 5 step 4) is a TriageLens
+    convention pySigma does not model; it is stripped before the parse so a
+    rule using it stays healthy, and kept in the stored YAML for the
+    correlation stage to read.
+    """
+    block = document.get("correlation")
+    if not isinstance(block, dict) or "generate" not in block:
+        return document
+    return {**document, "correlation": {k: v for k, v in block.items() if k != "generate"}}
 
 
 def _decode(raw: bytes) -> str:

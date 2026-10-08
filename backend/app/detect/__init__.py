@@ -11,10 +11,12 @@ This package holds everything that turns a Sigma rule into an executable query:
 * :mod:`rules` - YAML rule loading into the ``rules`` catalogue,
 * :mod:`profiles` - which enabled rules a run executes,
 * :mod:`engine` - one run: route, prune, compile, execute under budget,
+* :mod:`correlation` - Sigma correlation rules over the base matches,
 * :mod:`alerts` - match grouping into deterministic, re-run-stable alerts,
 * :mod:`scoring` - ``base(level) + modifiers``, clamped to 0-100.
 
-Correlation builds on top of these in the layer above (spec 04 section 5).
+MITRE ATT&CK mapping builds on top of these in the layer above (spec 04
+section 7).
 """
 
 from __future__ import annotations

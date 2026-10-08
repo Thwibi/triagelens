@@ -63,8 +63,8 @@ def build_alerts(
             continue
         if execution.outcome.status != RULE_RUN_OK or not execution.matches:
             continue
-        false_positives = _yaml_list(record.yaml, "falsepositives")
-        references = _yaml_list(record.yaml, "references")
+        false_positives = yaml_list(record.yaml, "falsepositives")
+        references = yaml_list(record.yaml, "references")
         for group_key, matches in sorted(_group_by_key(execution.matches).items()):
             for cluster in _clusters(matches, window_ms):
                 first = cluster[0]
@@ -118,6 +118,29 @@ def record_alerts(
         window_minutes=window_minutes,
         max_sample_events=max_sample_events,
     )
+    return record_drafts(
+        connection,
+        case_id=case_id,
+        run_id=run_id,
+        rules=rules,
+        drafts=drafts,
+    )
+
+
+def record_drafts(
+    connection: sqlite3.Connection,
+    *,
+    case_id: str,
+    run_id: str,
+    rules: Mapping[str, RuleRecord],
+    drafts: Sequence[AlertDraft],
+) -> list[AlertRecord]:
+    """Persist and score pre-built drafts in one transaction.
+
+    The shared commit path for the base and the correlation stage: replace
+    the previous run's ``new`` alerts, upsert every draft with carry-over,
+    link evidence, then score - modifiers need the peers in place first.
+    """
     repository = AlertRepository(connection)
     with atomic(connection):
         repository.clear_previous_new(case_id, run_id)
@@ -170,7 +193,7 @@ def _effective_ms(match: EventMatch) -> int:
     return _EPOCH_MS if match.ts_ms is None else match.ts_ms
 
 
-def _yaml_list(yaml_text: str, key: str) -> tuple[str, ...]:
+def yaml_list(yaml_text: str, key: str) -> tuple[str, ...]:
     """A rule's ``falsepositives``/``references`` list, in document order.
 
     The rule loader already parsed this document once, so a failure here
@@ -191,4 +214,4 @@ def _yaml_list(yaml_text: str, key: str) -> tuple[str, ...]:
     return tuple(str(item) for item in raw if item is not None)
 
 
-__all__ = ["build_alerts", "record_alerts"]
+__all__ = ["build_alerts", "record_alerts", "record_drafts", "yaml_list"]
