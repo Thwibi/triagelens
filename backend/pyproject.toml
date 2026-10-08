@@ -15,7 +15,6 @@ dependencies = [
     "pydantic==2.13.5",
     "python-multipart==0.0.32",
     "PyYAML==6.0.3",
-    "regex==2026.9.29",
     "lxml==6.1.3",
     # The native EVTX reader (pyevtx-rs). The vendored pure-Python fallback in
     # app/ingest/parsers/evtxlib keeps the evtx parser working where this
@@ -24,6 +23,12 @@ dependencies = [
     # zoneinfo has no database on Windows, so the IANA rules have to ship with
     # the app: parsing a naive log timestamp in a case timezone needs them.
     "tzdata==2026.5",
+    # Sigma parsing and SQL compilation for the detection engine. Held on the 1.x
+    # line because pysigma-backend-sqlite only supports pySigma < 2.0, and the
+    # 1.x SigmaCorrelationRule/lens matches the legacy `correlation:` blocks the
+    # builtin rule set (spec 04 section 10) ships.
+    "pySigma==1.5.1",
+    "pysigma-backend-sqlite==2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -37,7 +42,6 @@ dev = [
     "mypy==2.4.0",
     "ruff==0.16.10",
     "types-PyYAML==6.0.12.20260906",
-    "types-regex==2026.9.10.20260911",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -99,6 +103,10 @@ ignore = [
 # S608 fires on f-string SQL. Every case interpolates a module-level constant or
 # an int already validated by config; no request value is ever concatenated.
 "app/db/*" = ["S608"]
+# S608 fires on SQL assembled from the routing map and pySigma-escaped literals
+# (app/detect/backend.py, app/detect/compile.py). Both inputs are trusted files
+# that ship with the build and are validated at load time.
+"app/detect/*" = ["S608"]
 # S608 fires on INSERT_SQL, which interpolates only the module-level
 # EVENT_COLUMNS tuple. No request or record value ever reaches the SQL text.
 "app/ingest/events.py" = ["S608"]
@@ -138,9 +146,20 @@ plugins = ["pydantic.mypy"]
 mypy_path = "app"
 explicit_package_bases = true
 namespace_packages = true
+# mypy's native parser is a compiled (mypyc/Rust) extension that several
+# sandboxed hosts cannot load. The pure-Python fastparse parser is fully
+# supported and behaves identically for type checking, so disable the native
+# one to keep the gate runnable everywhere.
+native_parser = false
 
 [[tool.mypy.overrides]]
 module = ["lxml.*", "regex", "yaml", "uvicorn.*"]
+ignore_missing_imports = true
+
+# ``sigma`` ships py.typed, but pysigma-backend-sqlite does not, so its module
+# tree (and the sigma.backends package it extends) is untyped third-party code.
+[[tool.mypy.overrides]]
+module = ["sigma.backends.*", "sigma.conversion.*", "sigma.detection.*"]
 ignore_missing_imports = true
 
 # The vendored python-evtx reader is third-party source kept byte-for-byte; it is

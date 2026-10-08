@@ -74,7 +74,7 @@ class TestStatementSplitting:
 class TestDiscovery:
     def test_the_shipped_migrations_are_discovered_in_order(self) -> None:
         migrations = discover_migrations(MIGRATIONS_DIR)
-        assert [entry.version for entry in migrations] == [1]
+        assert [entry.version for entry in migrations] == [1, 2]
         assert migrations[0].name == "init"
         assert migrations[0].label == "0001_init"
 
@@ -117,7 +117,7 @@ class TestApply:
     def test_applying_creates_every_expected_table(self, tmp_path: Path) -> None:
         database = Database(tmp_path / "t.db")
         try:
-            assert apply_migrations(database.writer, MIGRATIONS_DIR) == [1]
+            assert apply_migrations(database.writer, MIGRATIONS_DIR) == [1, 2]
             names = set(iter_table_names(database.writer))
             for expected in (
                 "schema_version",
@@ -163,12 +163,28 @@ class TestApply:
         finally:
             database.close()
 
+    def test_the_detection_indexes_exist_after_migrating(self, tmp_path: Path) -> None:
+        """Slice 1 adds the two detection hot-path indexes, so they must really exist."""
+        database = Database(tmp_path / "t.db")
+        try:
+            apply_migrations(database.writer, MIGRATIONS_DIR)
+            names = {
+                str(row["name"])
+                for row in database.writer.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_%'"
+                ).fetchall()
+            }
+            assert "idx_ev_action" in names
+            assert "idx_alert_events_event" in names
+        finally:
+            database.close()
+
     def test_applying_twice_is_a_no_op(self, tmp_path: Path) -> None:
         database = Database(tmp_path / "t.db")
         try:
-            assert apply_migrations(database.writer, MIGRATIONS_DIR) == [1]
+            assert apply_migrations(database.writer, MIGRATIONS_DIR) == [1, 2]
             assert apply_migrations(database.writer, MIGRATIONS_DIR) == []
-            assert applied_versions(database.writer) == {1}
+            assert applied_versions(database.writer) == {1, 2}
         finally:
             database.close()
 
@@ -262,7 +278,8 @@ class TestApply:
         try:
             migrations = discover_migrations(MIGRATIONS_DIR)
             assert [entry.version for entry in pending_migrations(database.writer, migrations)] == [
-                1
+                1,
+                2,
             ]
             apply_migrations(database.writer, MIGRATIONS_DIR)
             assert pending_migrations(database.writer, migrations) == []
@@ -270,7 +287,7 @@ class TestApply:
             database.close()
 
     def test_latest_known_version_is_the_highest_file(self) -> None:
-        assert latest_known_version(discover_migrations(MIGRATIONS_DIR)) == 1
+        assert latest_known_version(discover_migrations(MIGRATIONS_DIR)) == 2
 
     def test_latest_known_version_of_nothing_is_zero(self) -> None:
         assert latest_known_version([]) == 0

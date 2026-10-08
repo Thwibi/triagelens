@@ -1,0 +1,67 @@
+# Sigma logsource -> TriageLens route table (spec 04 section 3).
+#
+# Every entry maps to a predicate over the four inventory/event columns
+# ``log_type``, ``channel``, ``app_name``, ``ls_category``. A rule's route is the
+# AND of the matching entries for each logsource key it carries; multiple entries
+# for the same key are OR'ed. Keys present in a rule with no entry here make the
+# rule unroutable: it is skipped and listed under Rules -> Health, never matched
+# against all events by accident.
+#
+# Entries are validated at load time against this exact identifier/literal shape,
+# so a typo cannot turn into a predicate that references a real event row.
+product:
+  windows:   "log_type IN ('windows_evtx','windows_event_xml')"
+  linux:     "log_type IN ('linux_syslog','linux_auth','linux_journald','linux_auditd')"
+  apache:    "log_type IN ('apache_access','apache_error')"
+  nginx:     "log_type IN ('nginx_access','nginx_error')"
+  iis:       "log_type = 'iis_w3c'"
+service:
+  # product-scoped services (key is "<product>/<service>")
+  windows/security:        "channel = 'Security'"
+  windows/system:          "channel = 'System'"
+  windows/application:     "channel = 'Application'"
+  windows/sysmon:          "channel = 'Microsoft-Windows-Sysmon/Operational'"
+  windows/powershell:      "channel = 'Microsoft-Windows-PowerShell/Operational'"
+  windows/powershell-classic: "channel = 'Windows PowerShell'"
+  windows/taskscheduler:   "channel = 'Microsoft-Windows-TaskScheduler/Operational'"
+  windows/wmi:             "channel = 'Microsoft-Windows-WMI-Activity/Operational'"
+  windows/windefend:       "channel = 'Microsoft-Windows-Windows Defender/Operational'"
+  windows/dns-server:      "channel = 'DNS Server'"
+  windows/bits-client:     "channel = 'Microsoft-Windows-Bits-Client/Operational'"
+  windows/terminalservices-localsessionmanager: "channel = 'Microsoft-Windows-TerminalServices-LocalSessionManager/Operational'"
+  windows/firewall-as:     "channel = 'Microsoft-Windows-Windows Firewall With Advanced Security/Firewall'"
+  windows/ntlm:            "channel = 'Microsoft-Windows-NTLM/Operational'"
+  windows/codeintegrity-operational: "channel = 'Microsoft-Windows-CodeIntegrity/Operational'"
+  linux/auth:              "log_type = 'linux_auth' OR app_name IN ('sshd','sudo','su','login','useradd','usermod','userdel','groupadd','passwd')"
+  linux/sshd:              "app_name = 'sshd'"
+  linux/sudo:              "app_name = 'sudo'"
+  linux/syslog:            "log_type IN ('linux_syslog','linux_auth')"
+  linux/cron:              "app_name IN ('CRON','cron','crond')"
+  linux/auditd:            "log_type = 'linux_auditd'"
+  linux/journald:          "log_type = 'linux_journald'"
+  linux/kernel:            "app_name = 'kernel'"
+category:
+  # Direct: parser assigns ls_category with the same name
+  process_creation:     "ls_category = 'process_creation'"
+  network_connection:   "ls_category = 'network_connection'"
+  file_event:           "ls_category = 'file_event'"
+  file_delete:          "ls_category = 'file_delete'"
+  image_load:           "ls_category = 'image_load'"
+  driver_load:          "ls_category = 'driver_load'"
+  process_access:       "ls_category = 'process_access'"
+  process_termination:  "ls_category = 'process_termination'"
+  create_remote_thread: "ls_category = 'create_remote_thread'"
+  create_stream_hash:   "ls_category = 'create_stream_hash'"
+  pipe_created:         "ls_category = 'pipe_created'"
+  dns_query:            "ls_category = 'dns_query'"
+  wmi_event:            "ls_category = 'wmi_event'"
+  registry_add:         "ls_category = 'registry_add'"
+  registry_set:         "ls_category = 'registry_set'"
+  registry_event:       "ls_category IN ('registry_add','registry_set','registry_rename')"
+  registry_delete:      "ls_category = 'registry_delete'"
+  ps_script:            "ls_category = 'ps_script'"
+  ps_module:            "ls_category = 'ps_module'"
+  ps_classic_start:     "ls_category = 'ps_classic_start'"
+  webserver:            "ls_category = 'webserver'"
+  firewall:             "ls_category = 'firewall'"
+  proxy:                "ls_category = 'webserver'"
