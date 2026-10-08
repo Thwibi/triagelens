@@ -10,10 +10,11 @@ This package holds everything that turns a Sigma rule into an executable query:
 * :mod:`ext` - the one-time pySigma extension install (the ``utf16le`` alias),
 * :mod:`rules` - YAML rule loading into the ``rules`` catalogue,
 * :mod:`profiles` - which enabled rules a run executes,
-* :mod:`engine` - one run: route, prune, compile, execute under budget.
+* :mod:`engine` - one run: route, prune, compile, execute under budget,
+* :mod:`alerts` - match grouping into deterministic, re-run-stable alerts,
+* :mod:`scoring` - ``base(level) + modifiers``, clamped to 0-100.
 
-Correlation, alert grouping and scoring build on top of these and live in the
-layer above (spec 04 sections 5 to 7).
+Correlation builds on top of these in the layer above (spec 04 section 5).
 """
 
 from __future__ import annotations
