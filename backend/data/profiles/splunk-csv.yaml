@@ -1,0 +1,7 @@
+name: splunk-csv
+applies_when: { any_key: ["sourcetype", "_raw", "_time"] }
+timestamp: { path: "_time", format: iso8601 }
+timezone: UTC
+fields:
+  host:                 "host"
+  message:              "_raw"

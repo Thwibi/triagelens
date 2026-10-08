@@ -1,0 +1,8 @@
+#separator \x09
+#path	conn
+#fields	ts	uid	id.orig_h	id.orig_p	id.resp_h	id.resp_p	proto	service	duration	orig_bytes	resp_bytes
+#types	string	string	string	string	string	string	string	string	string	string	string
+1767182400.000000	CTu1	192.0.2.10	44322	198.51.100.9	80	tcp	http	1.0	10	20
+1767182401.000000	CTu2	185.220.101.45	40001	10.0.0.5	22	tcp	http	1.0	10	20
+1767182402.000000	CTu3	192.0.2.10
+#close	2026-03-01-12-01-00

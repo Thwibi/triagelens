@@ -1,0 +1,10 @@
+Mar  2 08:00:00 web01 systemd[1]: Started Daily apt upgrade and clean activities.
+Mar  2 08:00:01 web01 app[2000]: first line of a multi-line message
+    second line of the message
+    third line of the message
+2026-03-02T08:00:02Z web01 kernel: usb 1-1: new high-speed USB device
+2026-03-02T08:00:03.500+02:00 web01 nginx[2100]: GET /index.html 200
+<165>1 2026-03-02T08:00:04Z web01 nginx 2100 ID47 - request processed
+<134>1 2026-03-02T08:00:05.250Z web01 app 2200 - - structured message
+this line matches no framing and must become a failure
+Mar  2 08:00:06 web01 sshd[1200]: Failed password for test from 198.51.100.9 port 33000 ssh2

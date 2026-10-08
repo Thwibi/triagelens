@@ -188,7 +188,23 @@ def load_builtin_parsers() -> ParserRegistry:
     Import order does not matter because each module registers itself on import
     through :func:`_register`.
     """
-    from app.ingest.parsers import generic_json  # noqa: F401
+    from app.ingest.parsers import (
+        fw_cisco_asa,  # noqa: F401
+        fw_fortinet,  # noqa: F401
+        fw_iptables,  # noqa: F401
+        fw_paloalto,  # noqa: F401
+        fw_pfsense,  # noqa: F401
+        generic_csv,  # noqa: F401
+        generic_json,  # noqa: F401
+        iis_w3c,  # noqa: F401
+        linux_auditd,  # noqa: F401
+        linux_journald,  # noqa: F401
+        linux_syslog,  # noqa: F401
+        web_access,  # noqa: F401
+        web_error,  # noqa: F401
+        windows_event_xml,  # noqa: F401
+        windows_evtx,  # noqa: F401
+    )
 
     return REGISTRY
 

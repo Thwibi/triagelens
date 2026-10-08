@@ -79,7 +79,7 @@ class TestSuffixMap:
         ("name", "expected"),
         [
             ("a.evtx", "windows_evtx"),
-            ("a.xml", "xml"),
+            ("a.xml", "windows_event_xml"),
             ("a.json", "generic_json"),
             ("a.ndjson", "generic_json"),
             ("a.jsonl", "generic_json"),
@@ -102,16 +102,16 @@ class TestSignatures:
         assert match_signature(b"ElfFile\x00\x01\x02") is not None
 
     def test_xml_declaration(self) -> None:
-        assert signature_of(b'<?xml version="1.0"?><Events/>') == "xml"
+        assert signature_of(b'<?xml version="1.0"?><Events/>') == "windows_event_xml"
 
     def test_xml_declaration_after_a_utf8_bom(self) -> None:
-        assert signature_of(b'\xef\xbb\xbf<?xml version="1.0"?>') == "xml"
+        assert signature_of(b"\xef\xbb\xbf<Events><Event/></Events>") == "windows_event_xml"
 
     def test_events_root(self) -> None:
-        assert signature_of(b"<Events><Event/></Events>") == "xml"
+        assert signature_of(b"<Events><Event/></Events>") == "windows_event_xml"
 
     def test_case_is_folded_for_text_signatures(self) -> None:
-        assert signature_of(b"<EVENTS>") == "xml"
+        assert signature_of(b"<EVENTS>") == "windows_event_xml"
 
     def test_no_signature(self) -> None:
         assert match_signature(b'{"a": 1}') is None
@@ -169,8 +169,8 @@ class TestDetectionDecisions:
 
     def test_override_for_an_unbuilt_parser_is_flagged(self, tmp_path: Path) -> None:
         path = write_plain(tmp_path / "a.log")
-        result = detect(path, override="windows_evtx")
-        assert result.log_type == "windows_evtx"
+        result = detect(path, override="linux_iptables")
+        assert result.log_type == "linux_iptables"
         assert result.parser_available is False
         assert "no parser" in result.reason
         # A choice this build cannot honour is not a decision: queueing a parse
@@ -189,7 +189,11 @@ class TestDetectionDecisions:
     ) -> None:
         path = tmp_path / "a.evtx"
         path.write_bytes(b"ElfFile\x00" + b"\x00" * 32)
-        result = detect(path)
+        # A registry without the EVTX parser: the magic is still recognized, but
+        # this build cannot parse it, so it must not be guessed at.
+        registry = ParserRegistry()
+        registry.register(StubParser("generic_json", 0.0))
+        result = detect(path, registry=registry)
         assert result.log_type == "windows_evtx"
         assert result.parser_available is False
         assert "no parser" in result.reason

@@ -1,0 +1,13 @@
+name: wazuh-alert
+applies_when: { any_key: ["full_log", "rule.description"] }
+timestamp: { path: "timestamp", format: iso8601 }
+timezone: UTC
+fields:
+  host:                 "agent.name"
+  user_name:            "data.dstuser"
+  src_ip:               "data.srcip"
+  src_port:             "data.srcport"
+  dst_ip:               "data.dstip"
+  dst_port:             "data.dstport"
+  event_action:         "rule.description"
+  message:              "full_log"

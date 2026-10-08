@@ -1,0 +1,9 @@
+type=SYSCALL msg=audit(1740909601.000:7001): arch=c000003e syscall=59 success=yes exit=0 a0=7ffd a1=7ffd a2=7ffd a3=7ffd items=2 ppid=900 pid=901 auid=1000 uid=0 gid=0 euid=0 tty=pts0 ses=1 comm="cat" exe="/usr/bin/cat" key="exec"
+type=EXECVE msg=audit(1740909601.000:7001): argc=3 a0="cat" a1="2F6574632F706173737764" a2="/etc/hosts"
+type=CWD msg=audit(1740909601.000:7001): cwd="/root"
+type=PATH msg=audit(1740909601.000:7001): item=0 name="/etc/passwd" inode=100 odev=fd:00 mode=0100644 ouid=0 ogid=0 rdev=00:00 nametype=NORMAL
+type=PATH msg=audit(1740909601.000:7001): item=1 name="/etc/hosts" inode=101 odev=fd:00 mode=0100644 ouid=0 ogid=0 rdev=00:00 nametype=NORMAL
+type=SYSCALL msg=audit(1740909602.000:7002): arch=c000003e syscall=42 success=yes exit=0 a0=3 a1=7ffc a2=10 a3=7ffc items=0 ppid=900 pid=902 auid=1000 uid=0 gid=0 euid=0 tty=pts0 ses=1 comm="curl" exe="/usr/bin/curl" key="network"
+type=SOCKADDR msg=audit(1740909602.000:7002): saddr=0200C350C000020A
+type=USER_AUTH msg=audit(1740909603.000:7003): pid=903 uid=0 auid=4294967295 ses=4294967295 subj=unconfined msg='op=PAM:authentication grantors=pam_unix acct="admin" exe="/usr/sbin/sshd" hostname=? addr=203.0.113.9 terminal=ssh res=failed'
+type=USER_LOGIN msg=audit(1740909603.000:7003): pid=903 uid=0 auid=4294967295 ses=4294967295 subj=unconfined msg='op=login acct="admin" exe="/usr/sbin/sshd" hostname=? addr=203.0.113.9 terminal=ssh res=failed'

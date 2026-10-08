@@ -20,22 +20,17 @@ from pathlib import Path
 from typing import Any
 
 from app.ingest.events import NormalizedEvent
-from app.ingest.normalize import (
-    canonical_ip,
-    clean_text,
-    normalize_level,
-    normalize_outcome,
-    parse_timestamp,
-    to_int,
-    to_port,
-    truncate,
-)
 from app.ingest.parsers.base import (
     ParseContext,
     ParseFailure,
     _register,
 )
-from app.ingest.profiles import Profile, ProfileError, flatten, load_profiles, resolve
+from app.ingest.parsers.generic_common import (
+    load_profiles_cached,
+    map_record,
+    pick_profile,
+)
+from app.ingest.profiles import Profile, ProfileError
 from app.ingest.text import TextHead
 
 #: Keys under which a JSON array of records may hide (spec 03 section 6).
@@ -50,6 +45,11 @@ _OBJECT_LINE = re.compile(r"^\s*\{")
 #: Share of sampled lines that must be JSON objects to call a file NDJSON.
 _JSON_LINE_SHARE = 0.8
 
+#: Keys that mark a JSON object as a ``journalctl -o json`` record. The generic
+#: JSON parser defers to ``linux_journald`` when it sees them, because the same
+#: bytes would otherwise be claimed here and lose the journal-specific mapping.
+_JOURNALD_MARKERS = ("__REALTIME_TIMESTAMP", "SYSLOG_IDENTIFIER")
+
 #: Bytes read to decide whether a file is one document or many.
 _DOCUMENT_HEAD_BYTES = 64 * 1024
 
@@ -58,37 +58,15 @@ _DOCUMENT_HEAD_BYTES = 64 * 1024
 _MAX_DOCUMENT_BYTES = 1 << 30
 
 
-def _profiles_dir() -> Path:
-    """Directory holding the shipped profiles, ``backend/data/profiles``."""
-    return Path(__file__).resolve().parents[3] / "data" / "profiles"
-
-
-#: Holder for the last successful load: profiles plus the directory mtime stamp.
-_PROFILE_CACHE: dict[str, tuple[dict[str, Profile], tuple[tuple[str, int], ...]]] = {}
-
-
-def load_profiles_cached() -> dict[str, Profile]:
-    """Profiles from disk, re-read when the directory changes.
-
-    Cached because a parse worker loads this once per source and the directory
-    is tiny; the mtime check keeps a profile edited in the UI from being
-    ignored until restart.
-    """
-    directory = _profiles_dir()
-    stamp = _dir_stamp(directory)
-    cached = _PROFILE_CACHE.get("entry")
-    if cached is not None and cached[1] == stamp:
-        return cached[0]
-    profiles = load_profiles(directory)
-    _PROFILE_CACHE["entry"] = (profiles, stamp)
-    return profiles
-
-
-def _dir_stamp(directory: Path) -> tuple[tuple[str, int], ...]:
-    """Sorted (name, mtime) of the profile files, for cache invalidation."""
-    if not directory.is_dir():
-        return ()
-    return tuple(sorted((path.name, path.stat().st_mtime_ns) for path in directory.glob("*.y*ml")))
+def _looks_like_journal(line: str) -> bool:
+    """True when a JSON line carries a ``journalctl -o json`` marker key."""
+    try:
+        record = json.loads(line)
+    except (ValueError, TypeError):
+        return False
+    if not isinstance(record, dict):
+        return False
+    return any(marker in record for marker in _JOURNALD_MARKERS)
 
 
 class GenericJsonParser:
@@ -108,6 +86,8 @@ class GenericJsonParser:
         """0.9 for JSON lines, 0.85 for a document that starts with an object."""
         lines = [line for line in head.lines if line.strip()]
         if not lines:
+            return 0.0
+        if _looks_like_journal(lines[0]):
             return 0.0
         json_lines = sum(1 for line in lines if _OBJECT_LINE.match(line))
         fraction = json_lines / len(lines)
@@ -176,7 +156,7 @@ class GenericJsonParser:
             if not isinstance(record, dict):
                 yield ParseFailure(record_ref, "expected a JSON object", line)
                 continue
-            profile = _pick_profile(record, profiles)
+            profile = pick_profile(record, profiles)
             if profile is None:
                 yield ParseFailure(record_ref, "no mapping profile matches this record", line)
                 continue
@@ -197,7 +177,7 @@ class GenericJsonParser:
         if records is None:
             # A pretty-printed file holding one record has no list, but it is
             # still a perfectly good record, so try it as one before giving up.
-            if isinstance(document, dict) and _pick_profile(document, profiles) is not None:
+            if isinstance(document, dict) and pick_profile(document, profiles) is not None:
                 records = [document]
             else:
                 yield ParseFailure(
@@ -211,7 +191,7 @@ class GenericJsonParser:
             if not isinstance(record, dict):
                 yield ParseFailure(record_ref, "expected a JSON object", None)
                 continue
-            profile = _pick_profile(record, profiles)
+            profile = pick_profile(record, profiles)
             if profile is None:
                 yield ParseFailure(record_ref, "no mapping profile matches this record", None)
                 continue
@@ -227,61 +207,14 @@ class GenericJsonParser:
         raw: str,
     ) -> NormalizedEvent:
         """Map one record through a profile into an event."""
-        values: dict[str, Any] = {}
-        for name, path in profile.fields.items():
-            values[name] = resolve(record, path)
-
-        timestamp = parse_timestamp(
-            resolve(record, profile.timestamp_path),
-            fmt=profile.timestamp_format,
-            assume_tz=profile.timezone or context.timezone,
-        )
-        clipped_raw, _ = truncate(raw, context.max_line_bytes)
-
-        return NormalizedEvent(
-            case_id=context.case_id,
-            source_id=context.source_id,
+        return map_record(
+            context=context,
+            profile=profile,
+            record=record,
             record_ref=record_ref,
+            raw=raw,
             log_type=self.log_type,
-            raw=clipped_raw,
-            ts_ms=timestamp[0] if timestamp else None,
-            ls_category=profile.category_for(record),
-            host=clean_text(values.get("host")),
-            event_id=to_int(values.get("event_id")),
-            level=normalize_level(values.get("level")),
-            event_action=clean_text(values.get("event_action")),
-            event_outcome=normalize_outcome(values.get("event_outcome")),
-            user_name=clean_text(values.get("user_name")),
-            src_ip=canonical_ip(values.get("src_ip")),
-            src_port=to_port(values.get("src_port")),
-            dst_ip=canonical_ip(values.get("dst_ip")),
-            dst_port=to_port(values.get("dst_port")),
-            process_path=clean_text(values.get("process_path")),
-            process_cmdline=clean_text(values.get("process_cmdline")),
-            parent_process_path=clean_text(values.get("parent_process_path")),
-            file_path=clean_text(values.get("file_path")),
-            url=clean_text(values.get("url")),
-            http_method=clean_text(values.get("http_method")),
-            http_status=to_int(values.get("http_status")),
-            user_agent=clean_text(values.get("user_agent")),
-            message=clean_text(values.get("message")),
-            fields_json=_fields_json(record, profile),
         )
-
-
-def _fields_json(record: dict[str, Any], profile: Profile) -> dict[str, Any]:
-    """Every original field, plus an address that failed validation.
-
-    Spec 02 section 2: an invalid IP never reaches a column but must not vanish.
-    It is re-attached here under ``*_raw`` so the evidence survives.
-    """
-    flattened = flatten(record)
-    result: dict[str, Any] = dict(flattened)
-    for column in ("src_ip", "dst_ip"):
-        value = resolve(record, profile.fields.get(column, ""))
-        if value is not None and canonical_ip(value) is None:
-            result[f"{column}_raw"] = value
-    return result
 
 
 def _records_from_document(document: Any) -> list[Any] | None:
@@ -300,18 +233,6 @@ def _records_from_document(document: Any) -> list[Any] | None:
         if isinstance(inner, list):
             return [item.get("_source", item) if isinstance(item, dict) else item for item in inner]
     return None
-
-
-def _pick_profile(record: dict[str, Any], profiles: dict[str, Profile]) -> Profile | None:
-    """The most specific profile claiming this record.
-
-    Specificity is the number of ``applies_when`` keys, so a profile written for
-    one feed beats a catch-all that also matches.
-    """
-    candidates = [profile for profile in profiles.values() if profile.applies_to(record)]
-    if not candidates:
-        return None
-    return max(candidates, key=lambda profile: len(profile.applies_when_keys))
 
 
 def _is_single_document(path: Path) -> bool:

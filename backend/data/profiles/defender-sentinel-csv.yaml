@@ -1,0 +1,13 @@
+name: defender-sentinel-csv
+applies_when: { any_key: ["DeviceName", "ActionType", "InitiatingProcessFileName"] }
+timestamp: { path: "Timestamp", format: iso8601 }
+timezone: UTC
+fields:
+  host:                 "DeviceName"
+  user_name:            "InitiatingProcessAccountName"
+  src_ip:               "RemoteIP"
+  url:                  "RemoteUrl"
+  process_path:         "InitiatingProcessFileName"
+  process_cmdline:      "InitiatingProcessCommandLine"
+  file_path:            "FolderPath"
+  event_action:         "ActionType"

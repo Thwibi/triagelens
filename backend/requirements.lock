@@ -20,6 +20,8 @@ annotated-types==0.8.0 --hash=sha256:f072f4d804ea359e4eaf198b1af7a8b0943881a87f3
 anyio==4.15.1 --hash=sha256:6152fdbbf9a77fdec97731721bebf7c4c44f7c29b424b0065826173efc7ed101
 # click-8.5.0-py3-none-any.whl
 click==8.5.0 --hash=sha256:255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360
+# evtx-0.13.1-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+evtx==0.13.1 --hash=sha256:644a61fbcb2594286e8369c3f1de62d545ba18ac604f0487cbce3c268325400c
 # fastapi-0.142.2-py3-none-any.whl
 fastapi==0.142.2 --hash=sha256:bd5f4d81f1e93a88bcd77caf4dfe3c2dbffc3805407a0007e9a114c18b3a670b
 # h11-0.16.0-py3-none-any.whl

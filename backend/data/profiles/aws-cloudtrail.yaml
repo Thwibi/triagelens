@@ -1,0 +1,11 @@
+name: aws-cloudtrail
+applies_when: { any_key: ["eventSource", "eventName", "userIdentity"] }
+timestamp: { path: "eventTime", format: iso8601 }
+timezone: UTC
+fields:
+  user_name:            "userIdentity.arn"
+  src_ip:               "sourceIPAddress"
+  url:                  "requestParameters.url"
+  user_agent:           "userAgent"
+  event_action:         "eventName"
+  message:              "errorMessage"

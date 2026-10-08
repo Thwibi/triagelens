@@ -17,6 +17,7 @@ system inventing a format and producing confidently wrong columns.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -32,7 +33,7 @@ DECISION_MARGIN = 0.15
 #: Filename suffix to log type. A hint, never a decision on its own.
 SUFFIX_MAP: dict[str, str] = {
     ".evtx": "windows_evtx",
-    ".xml": "xml",
+    ".xml": "windows_event_xml",
     ".json": "generic_json",
     ".jsonl": "generic_json",
     ".ndjson": "generic_json",
@@ -54,8 +55,7 @@ class Signature:
 #: Hard signatures, checked before any parser is asked.
 SIGNATURES: tuple[Signature, ...] = (
     Signature(b"ElfFile\x00", "windows_evtx", "ElfFile magic (Windows EVTX)"),
-    Signature(b"<?xml", "xml", "XML declaration", fold_case=True),
-    Signature(b"<events", "xml", "<Events> root element", fold_case=True),
+    Signature(b"<Events", "windows_event_xml", "<Events> root element", fold_case=True),
 )
 
 #: UTF-8 BOM, stripped before a signature is compared so a BOM'd XML still matches.
@@ -93,8 +93,13 @@ class DetectionResult:
 
     @property
     def confidence(self) -> float:
-        """Score of the accepted candidate, or the best one when undecided."""
-        return self.candidates[0].confidence if self.candidates else 0.0
+        """Score of the strongest candidate, which is the accepted one.
+
+        A filename-suffix suggestion is listed at ``0.0`` so the operator can
+        see it next to the content vote; it must not be mistaken for the score
+        of a decision the content actually made.
+        """
+        return max((candidate.confidence for candidate in self.candidates), default=0.0)
 
     def as_dict(self) -> dict[str, object]:
         """JSON-ready form for the API."""
@@ -113,15 +118,24 @@ def detect_suffix(filename: str) -> str | None:
     return SUFFIX_MAP.get(Path(filename).suffix.lower())
 
 
+#: An XML declaration before the root element, skipped before matching so
+#: ``<?xml ...?><Events>`` is recognized on its root element.
+_XML_DECLARATION = re.compile(rb"^<\?xml[^>]*\?>")
+
+
 def match_signature(head: bytes) -> Signature | None:
     """The first hard signature present at the start of ``head``.
 
     Only a prefix is compared. Scanning the whole head would let a file that
-    merely mentions ``<?xml`` in its first 64 KB claim to be XML.
+    merely mentions a magic string claim the format. A leading XML declaration
+    is skipped first, because an XML export always carries one.
     """
     prefix = head[:_SIGNATURE_SCAN_BYTES]
     if prefix.startswith(_UTF8_BOM):
         prefix = prefix[len(_UTF8_BOM) :]
+    declaration = _XML_DECLARATION.match(prefix)
+    if declaration is not None:
+        prefix = prefix[declaration.end() :].lstrip()
     for signature in SIGNATURES:
         candidate = signature.magic
         if signature.fold_case:
@@ -183,7 +197,7 @@ def detect(
             reason="" if available else f"no parser for {override} is available in this build",
         )
 
-    head = read_head(path, max_bytes=SNIFF_BYTES, max_lines=SNIFF_LINES)
+    head = read_head(path, max_bytes=SNIFF_BYTES, max_lines=SNIFF_LINES, name=display_name)
 
     signature = match_signature(head.head)
     if signature is not None:

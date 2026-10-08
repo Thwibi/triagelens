@@ -1,0 +1,7 @@
+#Software: Microsoft Internet Information Services 10.0
+#Version: 1.0
+#Date: 2026-03-01 12:00:00
+#Fields: date time s-ip cs-method cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) sc-status sc-substatus sc-win32-status time-taken
+2026-03-01 12:00:00 192.0.2.20 GET /Default.htm - 80 - 203.0.113.7 Mozilla/5.0+(Windows+NT+10.0) 200 0 0 34
+2026-03-01 12:00:01 192.0.2.20 GET /admin/login.aspx returnurl=%2Fhome 80 - 203.0.113.7 Mozilla/5.0+(Windows+NT+10.0) 302 0 0 12
+2026-03-01 12:00:02 192.0.2.20 POST /api/upload - 80 CORP%5Calice 203.0.113.7 curl/8.0 401 2 5 3

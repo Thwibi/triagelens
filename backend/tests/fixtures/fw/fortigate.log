@@ -1,0 +1,7 @@
+date=2026-03-01 time=12:00:00 devname="FW01" type=traffic subtype=forward srcip=45.155.205.233 dstip=10.0.0.5 srcport=40001 dstport=22 proto=6 action=deny policyid=1 logid=0000000013 level=notice
+date=2026-03-01 time=12:00:01 devname="FW01" type=traffic subtype=forward srcip=45.155.205.233 dstip=10.0.0.5 srcport=40002 dstport=80 proto=6 action=deny policyid=1 logid=0000000013 level=notice
+date=2026-03-01 time=12:00:02 devname="FW01" type=traffic subtype=forward srcip=10.0.0.5 dstip=198.51.100.53 srcport=51000 dstport=443 proto=6 action=accept policyid=2 logid=0000000013 level=notice service=HTTPS
+date=2026-03-01 time=12:00:03 devname="FW01" type=traffic subtype=forward srcip=10.0.0.5 dstip=198.51.100.53 srcport=52000 dstport=53 proto=17 action=accept policyid=3 logid=0000000013 level=notice service=DNS
+date=2026-03-01 time=12:00:04 devname="FW01" type=utm subtype=webfilter srcip=10.0.0.5 dstip=203.0.113.66 srcport=53000 dstport=80 proto=6 action=block user="alice" url="http://malware.example/payload.exe" level=warning
+date=2026-03-01 time=12:00:05 devname="FW01" type=traffic subtype=forward srcip=45.155.205.233 dstip=10.0.0.5 srcport=40004 dstport=3389 proto=6 action=deny policyid=1 logid=0000000013 level=notice
+date=2026-03-01 time=12:00:06 devname="FW01" type=traffic action=deny

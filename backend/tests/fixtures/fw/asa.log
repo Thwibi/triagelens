@@ -1,0 +1,8 @@
+Mar  1 12:00:00 fw01 %ASA-4-106023: Deny tcp src outside:45.155.205.233/40001 dst inside:10.0.0.5/22 by access-group "acl_out"
+Mar  1 12:00:01 fw01 %ASA-4-106100: access-list acl_out denied tcp outside/45.155.205.233(40002) -> inside/10.0.0.5(22) hit-cnt 1 first hit [0x1, 0x0]
+Mar  1 12:00:02 fw01 %ASA-6-106100: access-list acl_in permitted tcp inside/10.0.0.5(51000) -> outside/198.51.100.53(443) hit-cnt 1 first hit [0x2, 0x0]
+Mar  1 12:00:03 fw01 %ASA-6-302013: Built outbound TCP connection 12345 for inside:10.0.0.5/51000 (10.0.0.5/51000) to outside:198.51.100.53/443 (198.51.100.53/443)
+Mar  1 12:00:04 fw01 %ASA-6-302014: Teardown TCP connection 12345 for inside:10.0.0.5/51000 (10.0.0.5/51000) to outside:198.51.100.53/443 (198.51.100.53/443) duration 0:00:05 bytes 1024
+Mar  1 12:00:05 fw01 %ASA-5-113005: AAA user authentication Rejected : reason = AAA failure : server = 10.0.0.1 : user = admin
+Mar  1 12:00:06 fw01 %ASA-6-302020: Built inbound ICMP connection for faddr 45.155.205.233/1 gaddr 10.0.0.5/0 laddr 10.0.0.5/0
+Mar  1 12:00:07 fw01 this line is not a Cisco ASA message

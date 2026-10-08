@@ -39,12 +39,32 @@ NOTES: dict[str, str] = {
     "events.filter_indexed": "Equality filter on an indexed column.",
     "events.fts_query": "MATCH query against the FTS5 index, LIMIT 50.",
     "api.health": "GET /api/health through the full middleware stack.",
+    "windows_evtx.parse": "Parsing committed EVTX fixtures with the EVTX parser.",
+    "windows_event_xml.parse": "Parsing a generated Event XML export with the XML parser.",
+    "linux_syslog.parse": "Parsing a generated RFC 3164 auth log with the syslog parser.",
+    "linux_auditd.parse": "Parsing generated multi-line audit groups with the auditd parser.",
+    "web_access.parse": "Parsing a generated Apache combined access log with the access parser.",
+    "fw_paloalto.parse": "Parsing a generated PAN-OS traffic CSV with the firewall parser.",
+    "generic_csv.parse": "Parsing a generated Splunk CSV export through the generic profile parser.",
+    "ioc.extract": "Tier-1 IOC extraction across representative events, decode passes included.",
 }
 
 
 #: Measurements that are naturally a throughput; the rest are latencies and get
 #: no rate, because a per-operation rate would read as a duration.
-THROUGHPUT = {"audit.append", "audit.verify", "events.insert"}
+THROUGHPUT = {
+    "audit.append",
+    "audit.verify",
+    "events.insert",
+    "windows_evtx.parse",
+    "windows_event_xml.parse",
+    "linux_syslog.parse",
+    "linux_auditd.parse",
+    "web_access.parse",
+    "fw_paloalto.parse",
+    "generic_csv.parse",
+    "ioc.extract",
+}
 
 
 def _format_rate(measurement: dict[str, Any]) -> str:
@@ -54,7 +74,8 @@ def _format_rate(measurement: dict[str, Any]) -> str:
     median = float(measurement["median"])
     if median <= 0:
         return "n/a"
-    return f"{1.0 / median:,.0f} rows/s"
+    per = "records/s" if measurement.get("unit") == "s/record" else "rows/s"
+    return f"{1.0 / median:,.0f} {per}"
 
 
 def device_info() -> dict[str, str]:

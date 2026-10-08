@@ -1,0 +1,21 @@
+Mar  1 12:00:01 web01 sshd[1200]: Failed password for admin from 185.220.101.45 port 40001 ssh2
+Mar  1 12:00:02 web01 sshd[1201]: Failed password for test from 185.220.101.45 port 40002 ssh2
+Mar  1 12:00:03 web01 sshd[1202]: Failed password for oracle from 185.220.101.45 port 40003 ssh2
+Mar  1 12:00:04 web01 sshd[1203]: Failed password for ubuntu from 185.220.101.45 port 40004 ssh2
+Mar  1 12:00:05 web01 sshd[1204]: Failed password for root from 185.220.101.45 port 40005 ssh2
+Mar  1 12:00:06 web01 sshd[1205]: Failed password for admin from 185.220.101.45 port 40006 ssh2
+Mar  1 12:00:07 web01 sshd[1206]: Failed password for test from 185.220.101.45 port 40007 ssh2
+Mar  1 12:00:08 web01 sshd[1207]: Failed password for oracle from 185.220.101.45 port 40008 ssh2
+Mar  1 12:00:09 web01 sshd[1208]: Failed password for ubuntu from 185.220.101.45 port 40009 ssh2
+Mar  1 12:00:10 web01 sshd[1209]: Failed password for root from 185.220.101.45 port 40010 ssh2
+Mar  1 12:00:11 web01 sshd[1210]: Failed password for admin from 185.220.101.45 port 40011 ssh2
+Mar  1 12:00:12 web01 sshd[1211]: Failed password for test from 185.220.101.45 port 40012 ssh2
+Mar  1 12:00:13 web01 sshd[1212]: Failed password for oracle from 185.220.101.45 port 40013 ssh2
+Mar  1 12:00:14 web01 sshd[1213]: Failed password for ubuntu from 185.220.101.45 port 40014 ssh2
+Mar  1 12:00:15 web01 sshd[1300]: Invalid user admin from 185.220.101.45 port 40015
+Mar  1 12:00:20 web01 sshd[1301]: Accepted password for root from 185.220.101.45 port 51890 ssh2
+Mar  1 12:00:25 web01 sshd[1301]: Received disconnect from 185.220.101.45 port 51890:11: Bye Bye [preauth]
+Mar  1 12:05:00 web01 sudo:   alice : TTY=pts/0 ; PWD=/home/alice ; USER=root ; COMMAND=/usr/sbin/useradd svc_backup
+Mar  1 12:05:01 web01 useradd[1260]: new user: name=svc_backup, UID=1001, GID=1001, home=/home/svc_backup, shell=/bin/bash
+Mar  1 12:06:00 web01 su[1400]: pam_unix(su:session): session opened for user root by alice(uid=1000)
+Mar  1 13:00:00 web01 CRON[1500]: (root) CMD (/usr/local/bin/backup.sh)

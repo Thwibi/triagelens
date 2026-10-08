@@ -13,7 +13,7 @@ import pytest
 
 from app.config import Settings
 from app.errors import ApiError, ErrorCode
-from app.ingest.import_from_path import is_within, resolve_import_path
+from app.ingest.import_from_path import import_candidates, is_within, resolve_import_path
 from app.ingest.intake import (
     MAX_FILENAME_LENGTH,
     IntakeResult,
@@ -465,6 +465,80 @@ class TestResolveImportPath:
         settings = Settings()
         names = [root.name for root in settings.resolved_import_roots]
         assert "imports" in names
+
+
+class TestImportCandidates:
+    """Directory expansion is opt-in and stays inside the allowed roots."""
+
+    def _root(self, tmp_path: Path) -> tuple[Settings, Path]:
+        root = tmp_path / "allowed"
+        root.mkdir()
+        settings = Settings(
+            storage={"data_dir": tmp_path / "d", "allowed_import_roots": [str(root)]}
+        )
+        return settings, root
+
+    def test_a_file_yields_itself(self, tmp_path: Path) -> None:
+        settings, root = self._root(tmp_path)
+        (root / "a.ndjson").write_bytes(b"x")
+        candidates = import_candidates(root / "a.ndjson", settings, recursive=False)
+        assert [candidate.name for candidate in candidates] == ["a.ndjson"]
+
+    def test_a_directory_without_recursive_is_refused(self, tmp_path: Path) -> None:
+        settings, root = self._root(tmp_path)
+        with pytest.raises(ApiError) as caught:
+            import_candidates(root, settings, recursive=False)
+        assert caught.value.code is ErrorCode.FORBIDDEN_PATH
+
+    def test_recursive_walks_in_sorted_order(self, tmp_path: Path) -> None:
+        settings, root = self._root(tmp_path)
+        (root / "z.ndjson").write_bytes(b"z")
+        (root / "a.ndjson").write_bytes(b"a")
+        (root / "sub").mkdir()
+        (root / "sub" / "m.ndjson").write_bytes(b"m")
+        candidates = import_candidates(root, settings, recursive=True)
+        # Depth-first, sorted inside each directory: root files first (a, z),
+        # then sub/m. Deterministic, not globally sorted, and that is fine.
+        assert [candidate.name for candidate in candidates] == ["a.ndjson", "z.ndjson", "m.ndjson"]
+
+    def test_a_file_symlink_escaping_the_root_is_skipped(self, tmp_path: Path) -> None:
+        settings, root = self._root(tmp_path)
+        secret = tmp_path / "secret.log"
+        secret.write_bytes(b"secret")
+        (root / "innocent.log").symlink_to(secret)
+        (root / "ok.ndjson").write_bytes(b"ok")
+        try:
+            candidates = import_candidates(root, settings, recursive=True)
+        except (OSError, NotImplementedError):
+            pytest.skip("symlinks are not available here")
+        assert [candidate.name for candidate in candidates] == ["ok.ndjson"]
+
+    def test_a_file_symlink_staying_in_the_root_is_included(self, tmp_path: Path) -> None:
+        settings, root = self._root(tmp_path)
+        inside = root / "real.ndjson"
+        inside.write_bytes(b"data\n")
+        (root / "alias.ndjson").symlink_to(inside)
+        try:
+            candidates = import_candidates(root, settings, recursive=True)
+        except (OSError, NotImplementedError):
+            pytest.skip("symlinks are not available here")
+        assert sorted(candidate.name for candidate in candidates) == [
+            "alias.ndjson",
+            "real.ndjson",
+        ]
+
+    def test_a_symlinked_subdirectory_is_not_descended_into(self, tmp_path: Path) -> None:
+        settings, root = self._root(tmp_path)
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (outside / "secret.ndjson").write_bytes(b"s")
+        (root / "linkdir").symlink_to(outside)
+        (root / "ok.ndjson").write_bytes(b"ok")
+        try:
+            candidates = import_candidates(root, settings, recursive=True)
+        except (OSError, NotImplementedError):
+            pytest.skip("symlinks are not available here")
+        assert [candidate.name for candidate in candidates] == ["ok.ndjson"]
 
 
 class TestIsWithin:

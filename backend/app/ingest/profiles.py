@@ -20,6 +20,9 @@ import yaml
 #: ``@`` is allowed because Elastic names its timestamp field ``@timestamp``.
 _SEGMENT = re.compile(r"[A-Za-z0-9_@\-]+|\[\*\]")
 
+#: ``kind`` value marking a YAML file as a parser resource, not a mapping profile.
+LAYOUT_KIND = "parser_layout"
+
 
 class ProfileError(ValueError):
     """A profile that cannot be used, with the reason."""
@@ -61,6 +64,9 @@ class Profile:
     #: Normalized field name to dot-notation path in the record.
     fields: dict[str, str]
     category_rules: list[CategoryRule] = field(default_factory=list)
+    #: Category used when no rule matches, for a feed whose every record shares
+    #: one category (Zeek network logs, for instance).
+    default_category: str | None = None
     #: Substrings of any key that make this profile plausible for a record.
     applies_when_keys: frozenset[str] = frozenset()
 
@@ -80,11 +86,11 @@ class Profile:
         return self.fields.get(field_name)
 
     def category_for(self, record: dict[str, Any]) -> str | None:
-        """First matching category rule, or ``None``."""
+        """First matching category rule, else the profile default, or ``None``."""
         for rule in self.category_rules:
             if rule.matches(record):
                 return rule.ls_category
-        return None
+        return self.default_category
 
 
 def flatten(record: Any, prefix: str = "") -> dict[str, Any]:
@@ -120,9 +126,15 @@ def resolve(record: dict[str, Any], path: str) -> Any:
     ``[*]`` takes the first element of an array. A path that walks into a
     non-object returns ``None`` rather than raising, because a profile describes
     records whose shape varies and a missing key is normal.
+
+    A flat record whose key literally contains a dot - a CSV column named
+    ``id.orig_h``, a Zeek field - is matched directly before the path is walked,
+    so dot notation keeps meaning nesting without forbidding dots in a name.
     """
     if not path:
         return None
+    if "[*]" not in path and path in record:
+        return record[path]
     current: Any = record
     for segment in _tokenize(path):
         if segment == "[*]":
@@ -206,6 +218,10 @@ def load_profile(path: Path) -> Profile:
     if not isinstance(keys, list):
         raise ProfileError(f"{path.name} applies_when.any_key must be a list")
 
+    default_category = document.get("default_category")
+    if default_category is not None and not isinstance(default_category, str):
+        raise ProfileError(f"{path.name} default_category must be a string")
+
     return Profile(
         name=name,
         timestamp_path=timestamp_path,
@@ -213,6 +229,7 @@ def load_profile(path: Path) -> Profile:
         timezone=(str(document["timezone"]) if document.get("timezone") else None),
         fields=fields,
         category_rules=rules,
+        default_category=default_category,
         applies_when_keys=frozenset(str(key) for key in keys),
     )
 
@@ -222,15 +239,31 @@ def load_profiles(directory: Path) -> dict[str, Profile]:
 
     A malformed file raises rather than being skipped: silently ingesting with
     fewer profiles than the operator believes are installed is worse than
-    refusing to start.
+    refusing to start. A file that declares ``kind: parser_layout`` is a parser
+    resource rather than a mapping profile (the PAN-OS positional layout lives
+    here), so it is passed over explicitly instead of failing validation.
     """
     loaded: dict[str, Profile] = {}
     if not directory.is_dir():
         return loaded
     for candidate in sorted(directory.glob("*.y*ml")):
+        if _declared_kind(candidate) == LAYOUT_KIND:
+            continue
         profile = load_profile(candidate)
         loaded[profile.name] = profile
     return loaded
+
+
+def _declared_kind(path: Path) -> str | None:
+    """The ``kind`` a YAML file declares, or ``None`` when it declares none."""
+    try:
+        document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (yaml.YAMLError, OSError):
+        return None
+    if isinstance(document, dict):
+        kind = document.get("kind")
+        return kind if isinstance(kind, str) else None
+    return None
 
 
 __all__ = [

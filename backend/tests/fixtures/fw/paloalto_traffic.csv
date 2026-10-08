@@ -1,0 +1,6 @@
+1,2026/03/01 12:00:00,0011,TRAFFIC,end,2026/03/01 12:00:00,45.155.205.233,10.0.0.5,0.0.0.0,0.0.0.0,scan-deny,-,-,web-browsing,vsys1,untrust,trust,ethernet1/1,ethernet1/2,log-forward,0,70001,1,40001,22,0,0,0x4000,tcp,deny,-
+1,2026/03/01 12:00:01,0011,TRAFFIC,end,2026/03/01 12:00:01,10.0.0.5,198.51.100.53,0.0.0.0,0.0.0.0,allow-web,alice,-,ssl,vsys1,trust,untrust,ethernet1/2,ethernet1/1,log-forward,0,70002,1,51000,443,0,0,0x4000,tcp,allow,-
+1,2026/03/01 12:00:03,0011,TRAFFIC,end,2026/03/01 12:00:03,45.155.205.233,10.0.0.5,0.0.0.0,0.0.0.0,scan-deny,-,-,ssh,vsys1,untrust,trust,ethernet1/1,ethernet1/2,log-forward,0,70003,1,40003,22,0,0,0x4000,tcp,drop,-
+1,2026/03/01 12:01:00,0011,THREAT,url,2026/03/01 12:01:00,10.0.0.5,203.0.113.66,0.0.0.0,0.0.0.0,malware-block,alice,-,web-browsing,vsys1,trust,untrust,ethernet1/2,ethernet1/1,log-forward,0,70004,1,52000,80,0,0,0x4000,tcp,block-url,http://malware.example/payload.exe,86202,malware,high
+1,2026/03/01 12:01:01,0011,THREAT,vulnerability,2026/03/01 12:01:01,45.155.205.233,10.0.0.5,0.0.0.0,0.0.0.0,exploit-deny,-,-,smb,vsys1,untrust,trust,ethernet1/1,ethernet1/2,log-forward,0,70005,1,40005,445,0,0,0x4000,tcp,reset-both,-,30000,exploit,critical
+1,2026/03/01,TRAFFIC,short

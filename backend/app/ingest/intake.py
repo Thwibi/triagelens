@@ -297,14 +297,21 @@ def intake_path(
     expand_archives: bool = True,
 ) -> IntakeResult:
     """Intake a file already on disk, such as a validated from-path import."""
-    return intake_stream(
-        path.open("rb"),
-        destination_dir,
-        path.name,
-        settings=settings,
-        log_type_override=log_type_override,
-        expand_archives=expand_archives,
-    )
+    handle = path.open("rb")
+    try:
+        return intake_stream(
+            handle,
+            destination_dir,
+            path.name,
+            settings=settings,
+            log_type_override=log_type_override,
+            expand_archives=expand_archives,
+        )
+    finally:
+        # The handle is closed here, never in the caller: the import path gets
+        # the stream it is given, and an unclosed handle would pin the original
+        # file on Windows, breaking the "copy, never hold the original" rule.
+        handle.close()
 
 
 def remove_stored(destination_dir: Path) -> None:

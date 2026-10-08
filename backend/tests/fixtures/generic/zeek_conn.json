@@ -1,0 +1,2 @@
+{"ts":1767182400.0,"uid":"CTu1","id.orig_h":"192.0.2.10","id.orig_p":44322,"id.resp_h":"198.51.100.9","id.resp_p":80,"proto":"tcp","service":"http"}
+{"ts":1767182401.0,"uid":"CTu2","id.orig_h":"185.220.101.45","id.orig_p":40001,"id.resp_h":"10.0.0.5","id.resp_p":22,"proto":"tcp","service":"ssh"}

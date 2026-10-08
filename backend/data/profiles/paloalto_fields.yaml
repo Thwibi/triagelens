@@ -1,0 +1,88 @@
+# PAN-OS firewall CSV field layouts (spec 03 section 5.4).
+#
+# PAN-OS exports a log record as a positional CSV row: the meaning of each column
+# is fixed by its index, not labelled in the row. This file names the columns so
+# `fw_paloalto` can find a field by name instead of hard-coding magic numbers.
+#
+# `index` is 0-based: the first CSV column is `fields[0]`. The order below follows
+# the PAN-OS 10.1 / 11.0 traffic and threat log field order.
+#
+# PROVISIONAL: authored from the documented PAN-OS field order rather than
+# captured from a live appliance (spec 03 section 5.4 permits shipping the
+# layouts; a later pass should diff them against a vendor field reference). The
+# traffic prefix is stable; the threat-only tail is the least certain part.
+kind: parser_layout
+version: "10.1/11.0"
+
+#: The column that names the log type in every layout.
+type_index: 3
+
+#: Layouts, keyed by the value of the type column.
+layouts:
+  traffic:
+    - future_use
+    - receive_time
+    - serial_number
+    - type
+    - subtype
+    - time_generated
+    - src
+    - dst
+    - natsrc
+    - natdst
+    - rule
+    - srcuser
+    - dstuser
+    - app
+    - vsys
+    - from
+    - to
+    - inbound_if
+    - outbound_if
+    - log_action
+    - future_use1
+    - sessionid
+    - repeatcnt
+    - sport
+    - dport
+    - natsport
+    - natdport
+    - flags
+    - proto
+    - action
+    - url_filename
+  threat:
+    - future_use
+    - receive_time
+    - serial_number
+    - type
+    - subtype
+    - time_generated
+    - src
+    - dst
+    - natsrc
+    - natdst
+    - rule
+    - srcuser
+    - dstuser
+    - app
+    - vsys
+    - from
+    - to
+    - inbound_if
+    - outbound_if
+    - log_action
+    - future_use1
+    - sessionid
+    - repeatcnt
+    - sport
+    - dport
+    - natsport
+    - natdport
+    - flags
+    - proto
+    - action
+    - url_filename
+    - threat_id
+    - category
+    - severity

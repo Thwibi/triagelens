@@ -1,0 +1,10 @@
+name: zeek
+applies_when: { any_key: ["id.orig_h", "id.resp_h"] }
+timestamp: { path: "ts", format: epoch_s }
+timezone: UTC
+default_category: network_connection
+fields:
+  src_ip:               "id.orig_h"
+  src_port:             "id.orig_p"
+  dst_ip:               "id.resp_h"
+  dst_port:             "id.resp_p"

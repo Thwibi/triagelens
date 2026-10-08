@@ -124,6 +124,10 @@ class TextHead:
 
     head: bytes
     lines: list[str] = field(default_factory=list)
+    #: The uploaded filename, so a parser can use a name hint (``auth.log``,
+    #: ``secure``) during detection. Optional because a head can be built for a
+    #: byte blob with no name at all.
+    name: str | None = None
 
     @property
     def text(self) -> str:
@@ -132,13 +136,17 @@ class TextHead:
 
 
 def read_head(
-    path: Path, *, max_bytes: int = SNIFF_BYTES, max_lines: int = SNIFF_LINES
+    path: Path,
+    *,
+    max_bytes: int = SNIFF_BYTES,
+    max_lines: int = SNIFF_LINES,
+    name: str | None = None,
 ) -> TextHead:
     """Read a bounded prefix of ``path`` for sniffing."""
     with open_binary(path) as handle:
         head = handle.read(max_bytes)
     lines = decode_bytes(head).split("\n")[:max_lines]
-    return TextHead(head=head, lines=[line.rstrip("\r") for line in lines])
+    return TextHead(head=head, lines=[line.rstrip("\r") for line in lines], name=name)
 
 
 def iter_text_lines(

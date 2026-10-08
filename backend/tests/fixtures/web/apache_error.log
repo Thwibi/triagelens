@@ -1,0 +1,3 @@
+[Wed Oct 01 12:00:00.123456 2025] [core:error] [pid 100:tid 5] [client 203.0.113.5:55000] AH00124: Request exceeded the limit
+[Wed Oct 01 12:00:01.000000 2025] [mpm_prefork:notice] [pid 100:tid 6] AH00163: Apache/2.4.58 (Unix) configured -- resuming normal operations
+[Wed Oct 01 12:00:02 2025] [rewrite:warn] [pid 101] [client 203.0.113.7] AH10000: rewrite rule matched

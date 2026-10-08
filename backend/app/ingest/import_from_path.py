@@ -130,6 +130,82 @@ def iter_import_candidates(
             continue
 
 
+def import_candidates(
+    raw: str | os.PathLike[str],
+    settings: Settings,
+    *,
+    recursive: bool,
+) -> list[ImportCandidate]:
+    """Expand one supplied path into the files that may be imported.
+
+    A regular file yields itself. A directory yields every regular file beneath it
+    when ``recursive`` is true; without the flag it is refused just like any other
+    non-regular path, so a client cannot accidentally blow the request open by
+    naming a folder.
+
+    Two rules keep the recursion contained: symlinked subdirectories are never
+    descended into (``follow_symlinks=False``), and a symlinked file only counts
+    when its target still resolves inside an allowed root. The names are sorted so
+    the same directory always imports in the same order.
+    """
+    if not str(raw).strip():
+        raise _forbidden("no path was supplied")
+
+    try:
+        resolved = Path(raw).expanduser().resolve(strict=True)
+    except (OSError, RuntimeError) as error:
+        raise _forbidden(
+            "path could not be resolved", path=str(raw), detail=type(error).__name__
+        ) from None
+
+    if not _within_roots(resolved, settings):
+        raise _forbidden(
+            "path is outside every allowed import root",
+            path=str(resolved),
+            allowed_roots=[str(root) for root in settings.resolved_import_roots],
+        )
+
+    try:
+        info = resolved.stat()
+    except OSError as error:
+        raise _forbidden(
+            "path could not be inspected", path=str(resolved), detail=type(error).__name__
+        ) from None
+
+    if stat.S_ISREG(info.st_mode):
+        return [ImportCandidate(path=resolved, size=info.st_size)]
+
+    if not stat.S_ISDIR(info.st_mode):
+        raise _forbidden("only regular files can be imported", path=str(resolved))
+    if not recursive:
+        raise _forbidden("a directory can only be imported with recursive=true", path=str(resolved))
+    return list(_walk_directory(resolved, settings))
+
+
+def _walk_directory(root: Path, settings: Settings) -> Iterator[ImportCandidate]:
+    """Every importable regular file under ``root``, in sorted order."""
+    for directory, names, files in os.walk(root, followlinks=False):
+        names[:] = sorted(name for name in names if not (Path(directory) / name).is_symlink())
+        for filename in sorted(files):
+            candidate = Path(directory) / filename
+            if candidate.is_symlink():
+                try:
+                    target = candidate.resolve(strict=False)
+                except OSError:
+                    continue
+                # A link pointing outside the allowed tree would copy bytes it
+                # was never granted; such a link is skipped, not followed.
+                if not _within_roots(target, settings):
+                    continue
+            else:
+                target = candidate
+            try:
+                size = target.stat().st_size
+            except OSError:
+                continue
+            yield ImportCandidate(path=candidate, size=size)
+
+
 def is_within(path: PurePath, root: PurePath) -> bool:
     """True when ``path`` is ``root`` or lives under it."""
     return path == root or root in path.parents
@@ -137,6 +213,7 @@ def is_within(path: PurePath, root: PurePath) -> bool:
 
 __all__ = [
     "ImportCandidate",
+    "import_candidates",
     "is_within",
     "iter_import_candidates",
     "resolve_import_path",
