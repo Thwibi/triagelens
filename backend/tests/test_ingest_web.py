@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -334,7 +335,7 @@ class TestWebGoldens:
         ]
 
 
-def _golden(event: NormalizedEvent) -> dict:
+def _golden(event: NormalizedEvent) -> dict[str, Any]:
     """The stable projection of an event stored in a golden."""
     return {
         name: getattr(event, name) for name in EVENT_COLUMNS if name not in ("source_id", "case_id")

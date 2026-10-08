@@ -151,7 +151,7 @@ def render_json(
     items: list[dict[str, Any]] = []
     for record in records:
         value = defang(record.value) if defanged else record.value
-        item = {
+        item: dict[str, Any] = {
             "id": record.id,
             "case_id": record.case_id,
             "type": record.type,

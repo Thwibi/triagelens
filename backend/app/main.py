@@ -24,6 +24,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.routing import WebSocketRoute
 from starlette.types import Scope
 
 from app.api.middleware import (
@@ -295,6 +296,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             # only copies HTTP routes: it drops ``@router.websocket`` handlers on
             # the floor without complaining, and every subscription then 404s.
             for route in router.routes:
+                if not isinstance(route, WebSocketRoute):
+                    continue
                 app.add_api_websocket_route(
                     f"{API_PREFIX}{route.path}", route.endpoint, name=route.name
                 )

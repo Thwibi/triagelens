@@ -254,7 +254,7 @@ async def patch_source(
         assumed_year=updated.assumed_year,
     )
     await manager.enqueue(job.id, encode_payload(job.id, record.case_id, [plan]))
-    return JSONResponse(
+    return JSONResponse(  # type: ignore[return-value]  # Response bypasses FastAPI's response model
         content={"job": _job_detail(job), "source": _source_detail(updated)},
         status_code=202,
     )

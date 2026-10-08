@@ -12,6 +12,8 @@ from __future__ import annotations
 import base64
 import re
 from ipaddress import ip_network
+from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -79,7 +81,7 @@ def candidate(
     value: str,
     *,
     base: int = BASE_FREETEXT,
-    **kwargs: object,
+    **kwargs: Any,
 ) -> IocCandidate:
     """An ``IocCandidate`` whose norm follows the canonical rules."""
     return IocCandidate(
@@ -565,10 +567,12 @@ class TestValidatePath:
         )
 
     def test_executable_extension_alone_is_enough(self) -> None:
-        assert validate_path(r"C:\Windows\System32\kernel32.dll").filename == "kernel32.dll"
+        assert validate_path(r"C:\Windows\System32\kernel32.dll") == PathMatch(
+            path=r"C:\Windows\System32\kernel32.dll", filename="kernel32.dll"
+        )
 
     def test_bare_drive_letter_path(self) -> None:
-        assert validate_path(r"C:\evil.exe").filename == "evil.exe"
+        assert validate_path(r"C:\evil.exe") == PathMatch(path=r"C:\evil.exe", filename="evil.exe")
 
     def test_boring_windows_path_is_dropped(self) -> None:
         assert validate_path(r"C:\Users\joe\notes.txt") is None
@@ -577,13 +581,17 @@ class TestValidatePath:
         assert validate_path("/tmp/evil.sh") == PathMatch(path="/tmp/evil.sh", filename="evil.sh")
 
     def test_var_www_nix_path(self) -> None:
-        assert validate_path("/var/www/shell.php").filename == "shell.php"
+        assert validate_path("/var/www/shell.php") == PathMatch(
+            path="/var/www/shell.php", filename="shell.php"
+        )
 
     def test_boring_nix_path_is_dropped(self) -> None:
         assert validate_path("/home/user/notes.txt") is None
 
     def test_unc_path(self) -> None:
-        assert validate_path(r"\\evil\incoming\payload.exe").filename == "payload.exe"
+        assert validate_path(r"\\evil\incoming\payload.exe") == PathMatch(
+            path=r"\\evil\incoming\payload.exe", filename="payload.exe"
+        )
 
     def test_suspicious_dirs_constants(self) -> None:
         assert "\\temp\\" in SUSPICIOUS_DIRS
@@ -1153,12 +1161,12 @@ class TestExtractCore:
 
 
 class TestTldLoading:
-    def test_load_tlds_reads_and_normalizes(self, tmp_path: str) -> None:
+    def test_load_tlds_reads_and_normalizes(self, tmp_path: Path) -> None:
         path = tmp_path / "tlds.txt"
         path.write_text("# comment\ncom\nOrg\n\nglobal\n", encoding="utf-8")
         assert load_tlds(path) == frozenset({"com", "org", "global"})
 
-    def test_load_tlds_missing_file_is_empty(self, tmp_path: str) -> None:
+    def test_load_tlds_missing_file_is_empty(self, tmp_path: Path) -> None:
         assert load_tlds(tmp_path / "absent.txt") == frozenset()
 
     def test_set_tlds_swaps_the_active_list(self) -> None:

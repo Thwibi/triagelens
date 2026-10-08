@@ -39,13 +39,13 @@ try:  # preferred: the native extension
 
     _NATIVE_AVAILABLE = True
 except (ImportError, OSError):  # DLL load can fail under an application-control policy
-    _PyEvtxParser = None  # type: ignore[assignment]
+    _PyEvtxParser = None  # type: ignore[misc, assignment]
     _NATIVE_AVAILABLE = False
 
 try:  # fallback: the reader vendored into this repository
     from app.ingest.parsers.evtxlib.Evtx import Evtx as _VendoredEvtx
 except ImportError:  # pragma: no cover - the vendored reader is always present
-    _VendoredEvtx = None
+    _VendoredEvtx = None  # type: ignore[misc, assignment]
 
 
 def native_backend_available() -> bool:
@@ -199,14 +199,14 @@ def _vendored_reader(context: ParseContext) -> Any:
     """A vendored ``Evtx`` reader for the file in ``context``."""
     from app.ingest.parsers.evtxlib.Evtx import Evtx
 
-    return Evtx(str(context.path))
+    return Evtx(str(context.path))  # type: ignore[no-untyped-call]
 
 
 def _vendored_error() -> type[BaseException]:
     """The vendored reader's own exception type, for the chunk guard."""
     from app.ingest.parsers import evtxlib
 
-    return evtxlib.Evtx.ParseException  # type: ignore[no-any-return]
+    return evtxlib.Evtx.ParseException
 
 
 def build() -> WindowsEvtxParser:

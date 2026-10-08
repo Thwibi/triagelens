@@ -7,6 +7,7 @@ independent of the HTTP surface exercised in ``test_api_iocs``.
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from app.db.repositories.iocs import IocRecord
 from app.ioc.export import (
@@ -95,7 +96,7 @@ class TestTxt:
 
 
 class TestStix:
-    def _bundle(self, items: list[IocRecord]) -> dict:
+    def _bundle(self, items: list[IocRecord]) -> dict[str, Any]:
         return render_stix(items)
 
     def test_every_spec_pattern_type_is_mapped(self) -> None:

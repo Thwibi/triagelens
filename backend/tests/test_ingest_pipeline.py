@@ -373,7 +373,7 @@ class TestWorkerCrash:
     @staticmethod
     def _crash_one_worker(client: TestClient) -> None:
         """Run a job whose worker dies, and wait for the failure to land."""
-        manager = client.app.state.job_manager
+        manager = client.app.state.job_manager  # type: ignore[attr-defined]
         finished: list[BaseException | None] = []
 
         async def crasher(item: dict[str, Any]) -> None:
@@ -383,6 +383,7 @@ class TestWorkerCrash:
                 finished.append(error)
 
         manager.register_handler("test-crasher", crasher)
+        assert client.portal is not None
         client.portal.call(manager.enqueue, "crash-job", {"kind": "test-crasher"})
 
         deadline = time.monotonic() + JOB_TIMEOUT_SECONDS
@@ -442,8 +443,9 @@ class TestCancellation:
             # dispatcher parks here until the test releases it.
             await asyncio.to_thread(release.wait)
 
-        manager = client.app.state.job_manager
+        manager = client.app.state.job_manager  # type: ignore[attr-defined]
         manager.register_handler("test-blocker", blocker)
+        assert client.portal is not None
         client.portal.call(manager.enqueue, "blocker-job", {"kind": "test-blocker"})
         assert started.wait(5.0), "the blocker job never started"
         return release
@@ -724,7 +726,7 @@ class LiveServer:
         # ``legacy=True`` because the socket is used directly rather than as a
         # context manager; websockets 17 otherwise warns on every read.
         socket_ = connect(f"{self.ws_url}{path}", open_timeout=20, legacy=True)
-        socket_.timeout = 2
+        socket_.timeout = 2  # type: ignore[attr-defined]  # present at runtime, absent from the stubs
         return socket_
 
     def drain(self, socket_: Any, seconds: float = 2.0) -> list[dict[str, Any]]:

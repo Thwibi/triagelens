@@ -67,7 +67,7 @@ def _share(head: TextHead) -> float:
     return matched / len(lines)
 
 
-def _moment(tokens: dict[str, str], assume_tz: str | None):
+def _moment(tokens: dict[str, str], assume_tz: str | None) -> int | None:
     """Epoch milliseconds from ``eventtime`` or ``date``+``time``(+``tz``)."""
     eventtime = tokens.get("eventtime")
     if eventtime is not None and eventtime.strip().isdigit():

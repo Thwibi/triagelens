@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -45,10 +46,10 @@ def context(
     )
 
 
-def run(parser: object, path: Path, **kwargs: object) -> tuple[list, list]:
+def run(parser: object, path: Path, **kwargs: Any) -> tuple[list[Any], list[Any]]:
     """Parse ``path`` and split the stream into (events, failures)."""
-    events: list = []
-    failures: list = []
+    events: list[Any] = []
+    failures: list[Any] = []
     for item in parser.parse(context(path, **kwargs)):  # type: ignore[attr-defined]
         if isinstance(item, ParseFailure):
             failures.append(item)
@@ -166,12 +167,11 @@ class TestMessageTable:
         assert matched.columns["user_name"] == "admin"
         assert matched.columns["src_ip"] == "1.2.3.4"
         assert matched.columns["src_port"] == "4000"
-        assert (
-            match_message(
-                "Failed password for invalid user admin from 1.2.3.4 port 1", "sshd"
-            ).action
-            == "ssh_failed_password"
+        invalid = match_message(
+            "Failed password for invalid user admin from 1.2.3.4 port 1", "sshd"
         )
+        assert invalid is not None
+        assert invalid.action == "ssh_failed_password"
 
     def test_sudo_command(self) -> None:
         match = match_message(
@@ -405,7 +405,7 @@ class TestEmptyAndFailures:
             assert not failures
 
 
-def _golden(event: object) -> dict:
+def _golden(event: object) -> dict[str, Any]:
     """The stable projection of an event stored in a golden."""
     return {
         name: getattr(event, name) for name in EVENT_COLUMNS if name not in ("source_id", "case_id")

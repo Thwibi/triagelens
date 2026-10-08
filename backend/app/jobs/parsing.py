@@ -30,7 +30,7 @@ from app.ingest.parsers.base import (
     ParseFailure,
     load_builtin_parsers,
 )
-from app.ioc import IocHit, default_allowlist, extract_fields
+from app.ioc import Allowlist, IocHit, default_allowlist, extract_fields
 
 #: Most IOC hits kept for one event, so a pathological record cannot balloon a
 #: batch before it crosses the process boundary.
@@ -39,10 +39,10 @@ MAX_HITS_PER_EVENT = 100
 #: ``(allowlist, decode_depth, keep_private_ips)`` loaded once per worker process.
 #: ``Settings()`` is a full config parse and this sits on the hot path, so it is
 #: cached in a box rather than rebuilt, and tests may reset it explicitly.
-_SETTINGS_BOX: dict[str, tuple] = {}
+_SETTINGS_BOX: dict[str, tuple[Allowlist, int, bool]] = {}
 
 
-def _extraction_settings() -> tuple:
+def _extraction_settings() -> tuple[Allowlist, int, bool]:
     """The three extraction settings this process needs, loaded on first use."""
     if "cfg" not in _SETTINGS_BOX:
         from app.config import Settings

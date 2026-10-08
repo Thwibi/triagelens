@@ -49,7 +49,7 @@ class AllowlistRepository:
 
     def entry_for_ioc(self, ioc: object) -> tuple[str, str] | None:
         """Derive ``(kind, value)`` to allowlist for a stored IOC, else ``None``."""
-        kind = _KIND_BY_TYPE.get(getattr(ioc, "type", ""))  # type: ignore[arg-type]
+        kind = _KIND_BY_TYPE.get(getattr(ioc, "type", ""))
         if kind is None:
             return None
         return kind, getattr(ioc, "value_norm", "")

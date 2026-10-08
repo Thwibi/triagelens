@@ -109,14 +109,15 @@ def _parse_values(line: str) -> dict[str, str]:
     merged in without letting them overwrite the outer ones, since the outer
     ``pid``/``type``/``msg`` describe the record itself.
     """
-    outer = {
-        matched.group("key"): _unquote(matched.group("value")) for matched in _FIELD.finditer(line)
+    outer: dict[str, str] = {
+        matched.group("key") or "": _unquote(matched.group("value")) or ""
+        for matched in _FIELD.finditer(line)
     }
     inner: dict[str, str] = {}
     for value in outer.values():
         if value and "=" in value:
             for matched in _FIELD.finditer(value):
-                inner.setdefault(matched.group("key"), _unquote(matched.group("value")))
+                inner.setdefault(matched.group("key") or "", _unquote(matched.group("value")) or "")
     if not inner:
         return outer
     return {**inner, **outer}
@@ -298,12 +299,12 @@ class LinuxAuditdParser:
         if address in {"?", "(none)"}:
             address = None
 
-        fields: dict[str, Any] = dict(flat)
-        fields["types"] = types
+        event_fields: dict[str, Any] = dict(flat)
+        event_fields["types"] = types
         if argv:
-            fields["argv"] = argv
+            event_fields["argv"] = argv
         if proctitle:
-            fields["proctitle"] = proctitle
+            event_fields["proctitle"] = proctitle
         raw = truncate("\n".join(group), context.max_line_bytes)[0]
         return NormalizedEvent(
             case_id=context.case_id,
@@ -326,7 +327,7 @@ class LinuxAuditdParser:
             process_cmdline=clean_text(process_cmdline),
             file_path=clean_text(file_path),
             message=clean_text(process_cmdline or file_path or primary),
-            fields_json=fields,
+            fields_json=event_fields,
         )
 
 

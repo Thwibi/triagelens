@@ -16,6 +16,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from functools import lru_cache
 from pathlib import Path
+from typing import cast
 
 import yaml
 
@@ -69,12 +70,15 @@ _SEVERITY_LEVEL = {
 @lru_cache(maxsize=1)
 def _layout_document() -> dict[str, object]:
     """The parsed layout file, loaded once."""
-    return yaml.safe_load(_LAYOUT_PATH.read_text(encoding="utf-8"))
+    return cast(dict[str, object], yaml.safe_load(_LAYOUT_PATH.read_text(encoding="utf-8")))
 
 
 def _type_index() -> int:
     """The column that carries the log type."""
-    return int(_layout_document()["type_index"])  # type: ignore[arg-type]
+    value = _layout_document()["type_index"]
+    if isinstance(value, (str, int)):
+        return int(value)
+    raise ValueError(f"layout type_index must be an integer, got {value!r}")
 
 
 def _layout(name: str) -> tuple[str, ...]:

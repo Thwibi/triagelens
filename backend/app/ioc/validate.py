@@ -28,17 +28,17 @@ from app.ioc.types import IocType
 
 #: RFC 5737 documentation ranges, treated as public (spec 05 section 5).
 DOCUMENTATION_NETS: tuple[ipaddress.IPv4Network, ...] = (
-    ipaddress.ip_network("192.0.2.0/24"),
-    ipaddress.ip_network("198.51.100.0/24"),
-    ipaddress.ip_network("203.0.113.0/24"),
+    ipaddress.IPv4Network("192.0.2.0/24"),
+    ipaddress.IPv4Network("198.51.100.0/24"),
+    ipaddress.IPv4Network("203.0.113.0/24"),
 )
 
 #: Extra public-but-unroutable ranges that must still read as private.
 _RESERVED_NETS: tuple[ipaddress.IPv4Network, ...] = (
-    ipaddress.ip_network("0.0.0.0/8"),
-    ipaddress.ip_network("100.64.0.0/10"),
-    ipaddress.ip_network("240.0.0.0/4"),
-    ipaddress.ip_network("255.255.255.255/32"),
+    ipaddress.IPv4Network("0.0.0.0/8"),
+    ipaddress.IPv4Network("100.64.0.0/10"),
+    ipaddress.IPv4Network("240.0.0.0/4"),
+    ipaddress.IPv4Network("255.255.255.255/32"),
 )
 
 #: Directories that make a file path worth extracting (spec 05 section 3).

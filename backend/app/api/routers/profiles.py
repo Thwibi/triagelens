@@ -275,7 +275,7 @@ def _parse_preview(
 
 def _preview_row(event: Any) -> dict[str, Any]:
     """One normalized event as short JSON for the preview table."""
-    row = event.to_dict()
+    row: dict[str, Any] = event.to_dict()
     row.pop("case_id", None)
     row.pop("source_id", None)
     row["fields"] = row.pop("fields_json", {})

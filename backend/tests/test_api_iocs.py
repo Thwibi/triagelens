@@ -100,7 +100,8 @@ def case_id(client: TestClient) -> str:
 def _iocs(client: TestClient, case_id: str, **params: Any) -> dict[str, Any]:
     response = client.get(f"/api/cases/{case_id}/iocs", params=params)
     assert response.status_code == 200, response.text
-    return response.json()
+    payload: dict[str, Any] = response.json()
+    return payload
 
 
 def _ioc_by_type(client: TestClient, case_id: str, ioc_type: str) -> list[dict[str, Any]]:

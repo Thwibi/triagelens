@@ -54,7 +54,7 @@ _APACHE_CODE = re.compile(r"\b(?P<code>AH\d{5})\b")
 _HTTP_METHOD = re.compile(r"^(?P<method>[A-Z]+) (?P<uri>\S+)(?: (?P<proto>HTTP/[\d.]+))?$")
 
 
-def _share(lines: tuple[str, ...], pattern: re.Pattern[str]) -> float:
+def _share(lines: list[str], pattern: re.Pattern[str]) -> float:
     """Fraction of non-empty sampled lines matching ``pattern``."""
     usable = [line for line in lines if line.strip()]
     if not usable:
