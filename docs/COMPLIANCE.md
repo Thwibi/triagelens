@@ -25,7 +25,7 @@ relative to `frontend/src/`.
 | EVTX: `evtx` (pyevtx-rs) primary, python-evtx fallback | `app/ingest/parsers/windows_evtx.py`, vendored `evtxlib/` fallback | `test_ingest_windows.py` | Covered |
 | Acceptance: every MUST implemented and covered by a test | this document | — | Partial (open gaps, below) |
 | Acceptance: `make test` passes; coverage ≥ 85% on `parsers`, `detect`, `ioc`, `mitre` | `scripts/task.py backend-coverage` (gate floor 80% overall; vendored `evtxlib/` omitted from coverage, as it already is from ruff and mypy) | `.coverage` report | Covered — `parsers` 88%, `detect` 92%, `ioc` 93%, `mitre` 94%, all ≥ 85%; overall 89.56% vs the 80% floor. The gate enforces 80% overall, the four named packages are measured and recorded here |
-| Acceptance: the three E2E scenarios in spec 09 §7 pass on expected alert/IOC/MITRE output | pipeline + detection | `test_ingest_pipeline.py`, `test_alerts_rules_mitre_api.py` | Partial (API-level, not "byte-for-byte"; no browser E2E) |
+| Acceptance: the three E2E scenarios in spec 09 §7 pass on expected alert/IOC/MITRE output | pipeline + detection | `test_ingest_pipeline.py`, `test_alerts_rules_mitre_api.py`; browser level: `frontend/e2e/scenario-{a,b,c}.spec.ts` | Covered — API-level assertions plus the Playwright suite (spec 09 §7) driving the real UI end to end |
 
 ## 01 — Architecture
 
@@ -76,8 +76,9 @@ No literal "MUST" tokens; the per-format tables are normative. Covered by
 ## 07 — UI spec
 
 No literal "MUST" tokens; the screen tables are normative. Covered by frontend
-Vitest suites (30 files) and, for the browser-level acceptance, the deferred
-Playwright E2E (see Gaps).
+Vitest suites (30 files) and, for the browser-level acceptance, the Playwright
+E2E scenarios (spec 09 §7) under `frontend/e2e/` (see Gaps for the a11y/bundle
+checks that remain unmeasured).
 
 ## 08 — Reporting and export
 
@@ -89,9 +90,9 @@ No literal "MUST" tokens; normative. Covered by `test_reports.py`,
 
 | Requirement | Code | Test | Status |
 |---|---|---|---|
-| §7 E2E Scenarios A/B/C (expected results normative) | pipeline + detection | `test_ingest_pipeline.py`, `test_alerts_rules_mitre_api.py`, `test_correlation.py`, `test_mitre.py` | Partial (API-level; browser E2E not run) |
+| §7 E2E Scenarios A/B/C (expected results normative) | pipeline + detection | `test_ingest_pipeline.py`, `test_alerts_rules_mitre_api.py`, `test_correlation.py`, `test_mitre.py`; browser level: `frontend/e2e/scenario-{a,b,c}.spec.ts` | Covered (API-level assertions plus the Playwright browser E2E) |
 | §9 S-01 zip bomb / zip-slip / symlink / absolute / nested | `app/ingest/archive.py` | `test_ingest_archive.py` (`test_zip_slip_writes_nothing_outside`, `test_absolute_member_is_refused`, `test_symlink_member_is_refused`, `test_expansion_ratio_bomb`, `test_nesting_deeper_than_allowed`), `test_ingest_pipeline.py` | Covered |
-| §9 S-02 hostile text inert in UI; escaped in HTML/MD/PDF | React text rendering, `app/reports/render.py` (autoescape) | `test_reports.py` (autoescape), frontend render tests | Partial (no Playwright "no dialog" assertion) |
+| §9 S-02 hostile text inert in UI; escaped in HTML/MD/PDF | React text rendering, `app/reports/render.py` (autoescape) | `test_reports.py` (autoescape), frontend render tests; `frontend/e2e/xss.spec.ts` (no dialog, text rendered inert) | Covered |
 | §9 S-03 CSV injection prefixed in exports | `app/util/csv.py` `safe_cell` | `test_events_export.py`, `test_reports.py::test_render_alerts_csv_escapes_injection` | Covered |
 | §9 S-04 SQL injection through every filter param / rule field | parameterized queries; `app/detect/fields.py` JSON-path builder doubles SQL quotes | `test_sql_injection.py` (filter sweep + hostile rule field + import), `test_detect_fields.py` | Covered |
 | §9 S-05 zero outbound connects on a full run; enrichment off → 403 | no network client ships; optional enrichment (spec 05 §9) not implemented | `test_ingest_pipeline.py::TestNoOutboundConnects` (socket guard, zero non-loopback connects; negative control proves the guard fires) | Covered (the 403 half is N/A: optional enrichment ships no endpoint, so there is nothing to gate) |
@@ -182,10 +183,10 @@ These are the requirements the matrix marks Partial/Gap. They are known and
 intentional at this point, and are tracked in `docs/STATUS.md`; fixing them is the
 remaining work.
 
-1. **Browser E2E and UI audits not run.** The spec 09 §7 scenarios pass at the
-   API level, but the Playwright E2E (including the S-02 "no dialog" XSS
-   assertion), the Lighthouse a11y ≥ 95 check and the bundle-size budget have no
-   harness here (Playwright and Lighthouse are not installed).
+1. **UI audits not run.** The spec 09 §7 scenarios and the S-02 render check now
+   run at the browser level (`frontend/e2e/`, four Playwright tests), but the
+   Lighthouse a11y ≥ 95 check and the bundle-size budget (spec 07) have no harness
+   here (Lighthouse is not installed).
 2. **Offline clean-machine install not executed.** `make package` and the
    installer exist, but the bundle was not installed on a separate
    network-disabled machine.
@@ -202,6 +203,7 @@ remaining work.
 ```bash
 make all                 # lint, typecheck, test on both sides
 make backend-coverage    # backend coverage floor
+make e2e                 # build the app and run the browser E2E suite
 make perf                # refresh docs/perf-results.md
 python scripts/task.py scripts-lint
 cd frontend && npx --no-install vitest --run

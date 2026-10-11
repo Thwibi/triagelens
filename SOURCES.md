@@ -8,14 +8,17 @@ so the shipped bytes can be reproduced and audited.
 
 - **Upstream:** https://github.com/SigmaHQ/sigma
 - **Pinned commit:** `48f2d096991a9ae89fd2710804901d1cd88d9746` (2024-05-31)
-- **Tree SHA-256:** `fbb1798c0b5303456930e1d477483378dc4333f36481c2bfccf8897f8dcf3829`
+- **Tree SHA-256:** `a2c3f33d76a44dbddd5fb537e3c73e07c4e128c8d9624db54dfbb7484cdf891f`
 - **Source SHA-256:** `c68b809a8621406ad82469954624b6468064cf595a575b1bb2fdba2ab0b2c88a`
 - **License:** Detection Rule License (DRL) 1.1 — see `backend/rules/sigma/LICENSE` and `THIRD_PARTY_NOTICES.md`
 - **Tooling:** `scripts/update_rules.py` (dir or zip source, dry-run, digest + SOURCE.txt regeneration)
 - **Selection:** every detection rule that parses, compiles with the SQLite backend and routes
   through `backend/rules/logsource_map.yaml`; the Windows slice is capped per rule family and
   severity (see `docs/DECISIONS.md`, "SigmaHQ sample" entry). The `SOURCE.txt` next to the rules
-  records the exact revision and selection counts.
+  records the exact revision and selection counts. A 2026-10-11 amendment added
+  four Windows rules (audit-log cleared, suspicious scheduled task, base64
+  PowerShell, suspicious RUN key) for the spec 09 §7 Scenario C acceptance; it is
+  noted in `SOURCE.txt` itself.
 
 ## MITRE ATT&CK — `backend/data/attack/` (not committed)
 

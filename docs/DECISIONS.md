@@ -3,6 +3,49 @@
 Each entry records a decision that is not obvious from the code, why it was
 made, and what it costs. Newest first. Dates are ISO-8601.
 
+## 2026-10-11 — Browser E2E for Scenarios A/B/C, and the Scenario C fixture rebuild
+
+**Decision.** The spec 09 §7 acceptance is now exercised end to end through the
+real UI, not only the API. `frontend/e2e/` runs Playwright against a single
+origin: `python -m app.main` (started by `e2e/serve.mjs` on an isolated temp data
+dir) serves the production bundle built into `backend/app/static`. Four tests run
+headless — `scenario-a.spec.ts`, `scenario-b.spec.ts`, `scenario-c.spec.ts` and
+`xss.spec.ts` (the S-02 "no dialog" assertion). A new `e2e` task
+(`scripts/task.py`, delegating from `make e2e`) builds the frontend and then runs
+`npm run e2e`; a matching `e2e` job in `.github/workflows/ci.yml` installs
+Chromium and uploads the report.
+
+Closing Scenario C exposed three non-obvious points:
+
+1. **The Windows fixture was rebuilt to match the spec, not the reverse.**
+   `backend/scripts/make_fixtures.py::security_logons()` now emits the nineteen
+   events spec 09 §7 describes (three 4624s, an eleven-account 4625 spray, the
+   type-3 success, a 4688, a 4698, a 4720 and an 1102), so `windows_logon_spray.yml`
+   and the four newly vendored SigmaHQ rules all fire. The golden
+   (`security_logons.xml.expected.json`) was regenerated from the same generator,
+   keeping it the single source of truth.
+2. **`example.org` is allowlisted on purpose.** Spec 05 §5 has the engine store
+   allowlisted IOCs with `is_allowlisted=1` and hide them in the UI unless "show
+   allowlisted" is on; `data/default_allowlist.yaml` lists `example.org`, so
+   Scenario C's `malicious-update.example.org` and its URL are extracted but
+   hidden by default. The spec's E2E spec therefore asserts only the two public
+   IPs in the default view, then navigates with `?allowlisted=1` to assert the
+   domain and URL. The checkbox itself proved flaky in headless Chromium, so the
+   URL filter is the deterministic lever.
+3. **Four SigmaHQ rules were vendored to cover Scenario C's non-spray alerts**
+   (audit-log cleared, suspicious scheduled task, base64 PowerShell, suspicious
+   RUN key); the vendored tree moved from 374 to 378 rules, Tree SHA-256
+   `a2c3f33d…`, with the amendment recorded in `rules/sigma/SOURCE.txt`.
+
+**Why.** Spec 00 requires every MUST to be implemented *and covered by a test*,
+and spec 07/09 make the three scenarios and the S-02 render check normative at
+the browser level. An API-level-only pass left that requirement Partial.
+
+**Cost.** The suite needs a built frontend and a Chromium install, so it is
+heavier than the unit gates and is not folded into `make all`. Lighthouse a11y
+and the bundle-size budget (spec 07) remain unmeasured, as does the offline
+clean-machine install.
+
 ## 2026-10-11 — Closing the 9f gaps: coverage, socket guard, licences, CI
 
 **Decision.** The five concrete gaps the 9f entry named were closed, and three
@@ -36,8 +79,9 @@ open would contradict spec 00's "85% on those four packages" and spec 09 S-05.
 the vendored reader is exercised by the real EVTX fixtures but is not itself
 measured. The socket test only guards the API/worker process it runs in (the
 parse pool is a separate process, but it makes no connects). The CI workflow has
-not yet run on a runner, and browser E2E / Lighthouse / offline clean-machine
-install remain unrun (see `docs/COMPLIANCE.md`).
+not yet run on a runner, and the Lighthouse / offline clean-machine install
+remain unrun (see `docs/COMPLIANCE.md`); the browser E2E suite was added later
+the same day.
 
 ## 2026-10-11 — Final verification (9f): what was run, what was not
 
@@ -56,8 +100,8 @@ and tests in the matrix.
 implemented *and covered by a test*; the honest form of that claim is a matrix
 with the gaps visible, not a green checkmark that hides them. Several checks are
 environment-bound: `pip-audit` was not installed and no CI workflow existed at the
-time (both since added), the Playwright E2E / Lighthouse / bundle-budget harness
-is not installed, the offline
+time (both since added), the Lighthouse / bundle-budget harness is not installed,
+the offline
 bundle has not been installed on a separate network-disabled machine, and the
 perf harness measures storage/parse/IOC/health primitives rather than the spec 09
 §8 end-to-end targets.
@@ -69,10 +113,11 @@ per-package 85% target; (2) no adversarial SQL-injection test (S-04); (3) no
 `yaml.safe_load` with neither a 1 MB document cap nor an alias-count limit
 (S-07); (5) the About dialog referenced but did not render
 `THIRD_PARTY_NOTICES.md`. All five were closed the same day — see "Closing the
-9f gaps" above. The environment-bound items remain: no browser E2E/a11y/bundle
+9f gaps" above. The environment-bound items remain: no a11y/bundle
 checks, no clean-machine offline install, and no spec 09 §8 end-to-end
 timing/memory verdict. Each is listed under "Gaps and open risks" in
-`docs/COMPLIANCE.md`.
+`docs/COMPLIANCE.md`. (The browser E2E half was closed later the same day — see
+"Browser E2E for Scenarios A/B/C".)
 
 ## 2026-10-11 — Deleting a case or source is audited, tombstones the chain, and removes files
 
@@ -491,7 +536,9 @@ attribution relies on the vendored `LICENSE` and `SOURCE.txt`.
 which pySigma 1.5 rejects as an invalid Sigma type), 100 parse but are
 unroutable, 0 other compile failures, 374 vendored (Windows 147 across 15
 families, Linux 186, Web 40, network/firewall 1). Loading the vendored tree is
-deterministic — two loads produce identical rows.
+deterministic — two loads produce identical rows. (A 2026-10-11 amendment added
+four Windows rules on top of this snapshot — see "Browser E2E for Scenarios
+A/B/C" — so the shipped tree is now 378 rules, Tree SHA-256 `a2c3f33d…`.)
 
 ## 2026-10-08 — The ambiguous-TLD penalty follows the acceptance path, not the suffix
 

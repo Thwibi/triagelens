@@ -49,9 +49,10 @@ environment are in `docs/COMPLIANCE.md`; the open gaps are listed below.
 | Frontend lint | `npx --no-install eslint . --max-warnings 0` (in `frontend/`) | clean |
 | Frontend types | `npx --no-install tsc --build --force` (in `frontend/`) | clean |
 | Frontend tests | `npx --no-install vitest --run` (in `frontend/`) | 232 passed (30 files) |
+| Browser E2E | `python scripts\task.py e2e` (builds the app, then Playwright) | 4 passed — Scenarios A/B/C + the S-02 XSS render check (spec 09 §7); Chromium headless |
 | Benchmarks | `.venv\Scripts\python.exe scripts\task.py perf` | 15 primitive benchmarks, refreshed `docs/perf-results.md` |
 | Audits | `npm audit --audit-level=high` (in `frontend/`) | 0 vulnerabilities; `pip-audit` is wired into `.github/workflows/ci.yml` but not run here (not installed) |
-| CI | `.github/workflows/ci.yml` | backend lint/typecheck/coverage, frontend lint/typecheck/test/`npm audit`, and a `pip-audit` job; not yet executed on a runner |
+| CI | `.github/workflows/ci.yml` | backend lint/typecheck/coverage, frontend lint/typecheck/test/`npm audit`, a `pip-audit` job, and a browser `e2e` job; not yet executed on a runner |
 
 ### Known limitations
 
@@ -72,9 +73,10 @@ environment are in `docs/COMPLIANCE.md`; the open gaps are listed below.
 - `docs/perf-results.md` is refreshed (2026-10-11) but the spec 09 §8 end-to-end
   targets (multi-worker throughput, 1M-event detection, 5M-event p95, UI paint,
   10 GB ingest memory) are not measured by the harness.
-- The final verification (9f) could not run everything here: no
-  Playwright/Lighthouse/bundle-checks, and no clean-machine offline install. The
-  unrun checks are itemised in `docs/COMPLIANCE.md` and `docs/DECISIONS.md`.
+- The final verification (9f) could not run everything here: the Lighthouse a11y
+  and bundle-size checks, and the clean-machine offline install, are unrun. The
+  browser E2E suite was added afterwards (`frontend/e2e/`, four Playwright tests).
+  The unrun checks are itemised in `docs/COMPLIANCE.md` and `docs/DECISIONS.md`.
 - The optional IOC enrichment (spec 05 §9) is not implemented: `allow_enrichment`
   is a reserved flag surfaced only in `/api/health`, so there is no network
   client to gate. A full ingest → detect → report run opening zero non-loopback
@@ -177,8 +179,10 @@ service it needs; see the 2026-10-10 decision.
   Vacuum, Rebuild-search-index, Verify-evidence-hashes and Verify-audit-chain
   actions were added in phase 9 slice 9d. The audit viewer is case-scoped
   (`GET /cases/{id}/audit-log`), so it asks for a case.
-- No Playwright E2E suite, screenshots or accessibility budget check yet; those
-  arrive with the remaining sub-phases.
+- Screenshots and the accessibility/bundle-size budget check are still absent; the
+  browser E2E suite now exists (`frontend/e2e/`, spec 09 §7 scenarios + the S-02
+  render check), but spec 07's Lighthouse a11y ≥ 95 and < 1.5 MB gzipped budget
+  are unmeasured.
 
 ## Phase 6 — Detection engine (implemented)
 
@@ -208,7 +212,7 @@ catalogue sync that seeds a fresh database with the shipped tree (slice 5).
 | Audit log | `GET /cases/{id}/audit-log` serves the append-only chain (spec 10 §2) newest-first: entries `{id, ts, case_id, action, detail, prev_hash, hash}` with pagination (`limit`/`offset`/`order`) and a per-request hash-chain verification `{chain_ok, rows_checked, head_hash, broken_at?, broken_reason?}` that always walks the whole chain so interleaved rows of other cases cannot hide a real edge |
 | Settings API | spec 06 "Health and settings": `GET /settings` returns `{settings, overrides, allowlist}` — the effective config with the auth token masked (spec 10 §1), the stored analyst overrides overlaid on it, and the global allowlist; `PUT /settings` validates a partial update of the editable keys (`detection.profile`) and appends a `settings_changed` audit row; `GET/POST/DELETE /settings/allowlist[/{id}]` manage global entries (idempotent per `(kind, value)`, `allowlist_changed` audit, unknown id → 404); `POST /cases/{id}/detect` defaults to the stored profile override, else config |
 | ATT&CK | `GET /mitre/matrix`, `/cases/{id}/mitre`, `/cases/{id}/mitre/navigator-layer` (MITRE Navigator layer v4), `GET/import /mitre/techniques…`; the import endpoint seeds tactics/techniques from a local `enterprise-attack.json` bundle via the same importer as `scripts/update_attack.py` |
-| Vendored SigmaHQ rules | `scripts/update_rules.py` vendors a pinned SigmaHQ/sigma snapshot into `rules/sigma/` — 374 rules measured by compile+routing health (Windows 147 across 15 families with per-level caps, Linux 186, Web 40, network/firewall 1); the tree is deterministic (double-load identical, digests asserted) and ships `SOURCE.txt`, `upstream-LICENSE.md` and the DRL 1.1 `LICENSE`; see `docs/DECISIONS.md` (2026-10-09) and `SOURCES.md` |
+| Vendored SigmaHQ rules | `scripts/update_rules.py` vendors a pinned SigmaHQ/sigma snapshot into `rules/sigma/` — 378 rules measured by compile+routing health (Windows 151, Linux 186, Web 40, network/firewall 1); a 2026-10-11 amendment added four Windows rules for the spec 09 §7 Scenario C acceptance (recorded in `rules/sigma/SOURCE.txt`); the tree is deterministic (double-load identical, digests asserted) and ships `SOURCE.txt`, `upstream-LICENSE.md` and the DRL 1.1 `LICENSE`; see `docs/DECISIONS.md` (2026-10-09) and `SOURCES.md` |
 | Provenance | root `SOURCES.md` records the SigmaHQ commit `48f2d096`, tree/source SHA-256, the ATT&CK import workflow, and the IANA TLD source; `THIRD_PARTY_NOTICES.md` reproduces the DRL 1.1 and MITRE ATT&CK terms of use |
 | Fixtures & scenarios | e2e detection tests drive the raw fixtures from earlier phases (Scenario A web shells, B brute-force, C scanning) through source → parse → detect and assert the expected alerts and their ATT&CK tags |
 
