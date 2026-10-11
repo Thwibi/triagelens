@@ -1155,7 +1155,7 @@ class TestWindowsIngest:
         source = source_state(client, body["sources"][0]["id"])
         assert source["log_type"] == "windows_event_xml"
         assert source["status"] == "done"
-        assert source["event_count"] == 11
+        assert source["event_count"] == 19
         assert source["error_count"] == 0
 
     def test_evtx_events_are_stored_with_the_mapped_columns(

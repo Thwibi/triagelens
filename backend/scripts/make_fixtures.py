@@ -103,17 +103,34 @@ def _document(events: list[str]) -> str:
     return f'<?xml version="1.0" encoding="utf-8"?>\n<Events xmlns="{_NS}">\n{body}\n</Events>\n'
 
 
-#: 4625 failures: a spray from one address, plus one from another (spec 09 P-06).
-_LOGON_FAILURES: list[tuple[str, str]] = [
-    ("admin", "198.51.100.77"),
-    ("root", "198.51.100.77"),
-    ("administrator", "198.51.100.77"),
-    ("admin", "198.51.100.99"),
+#: Scenario C: the accounts an 11-user password spray cycles through. The count
+#: has to clear ``windows_logon_spray.yml``'s 10-account threshold.
+_SPRAY_USERS: list[str] = [
+    "admin",
+    "administrator",
+    "root",
+    "guest",
+    "test",
+    "oracle",
+    "postgres",
+    "jenkins",
+    "backup",
+    "svc_backup",
+    "ftp",
 ]
+
+#: The spray source, which then logs in successfully (spec 09 section 7).
+_SPRAY_SOURCE = "198.51.100.77"
 
 
 def security_logons() -> str:
-    """Logon, failure, process-creation, task and account events (spec 09 P-06)."""
+    """Scenario C: logons, an 11-account spray and success, then the host chain.
+
+    The Security-log half of the Windows intrusion (spec 09 sections 2 and 7):
+    three baseline logons, an eleven-account spray from one address followed by a
+    successful logon from that address, a process creation, a scheduled task, a
+    new account, and the audit log being cleared.
+    """
     events = [
         event(
             event_id=4624,
@@ -158,20 +175,35 @@ def security_logons() -> str:
                 channel=SECURITY,
                 provider=AUDIT,
                 record_id=1100 + index,
+                time_created=f"2026-03-01T12:01:{index * 5:02d}.000000Z",
                 data={
                     "LogonType": "3",
                     "TargetUserName": user,
-                    "IpAddress": ip,
+                    "IpAddress": _SPRAY_SOURCE,
                     "IpPort": str(50000 + index),
                 },
             )
-            for index, (user, ip) in enumerate(_LOGON_FAILURES)
+            for index, user in enumerate(_SPRAY_USERS)
+        ),
+        event(
+            event_id=4624,
+            channel=SECURITY,
+            provider=AUDIT,
+            record_id=1111,
+            time_created="2026-03-01T12:02:00.000000Z",
+            data={
+                "LogonType": "3",
+                "TargetUserName": "admin",
+                "IpAddress": _SPRAY_SOURCE,
+                "IpPort": "50011",
+            },
         ),
         event(
             event_id=4688,
             channel=SECURITY,
             provider=AUDIT,
             record_id=2001,
+            time_created="2026-03-01T12:02:10.000000Z",
             data={
                 "NewProcessName": "C:\\Windows\\System32\\cmd.exe",
                 "CommandLine": "cmd.exe /c whoami",
@@ -183,10 +215,17 @@ def security_logons() -> str:
             channel=SECURITY,
             provider=AUDIT,
             record_id=2002,
+            time_created="2026-03-01T12:03:00.000000Z",
             data={
                 "TaskName": "\\Updater",
-                "TaskContent": "<Task><Actions><Exec><Command>powershell</Command>"
-                "<Arguments>-enc SQBFAFgA</Arguments></Exec></Actions></Task>",
+                "TaskContent": (
+                    "&lt;Task xmlns=&quot;http://schemas.microsoft.com/windows/2004/02/"
+                    "mit/task&quot;&gt;&lt;Actions&gt;&lt;Exec&gt;&lt;Command&gt;"
+                    "powershell.exe&lt;/Command&gt;&lt;Arguments&gt;-nop -w hidden -enc "
+                    "SQBFAFgA&lt;/Arguments&gt;&lt;/Exec&gt;&lt;Exec&gt;&lt;Command&gt;"
+                    "C:\\Users\\victim\\AppData\\Local\\Temp\\a.ps1&lt;/Command&gt;&lt;/Exec&gt;"
+                    "&lt;/Actions&gt;&lt;/Task&gt;"
+                ),
             },
         ),
         event(
@@ -194,6 +233,7 @@ def security_logons() -> str:
             channel=SECURITY,
             provider=AUDIT,
             record_id=2003,
+            time_created="2026-03-01T12:03:10.000000Z",
             data={
                 "TargetUserName": "svc-backup",
                 "TargetDomainName": "DC01",
@@ -203,8 +243,9 @@ def security_logons() -> str:
         event(
             event_id=1102,
             channel=SECURITY,
-            provider=AUDIT,
+            provider="Microsoft-Windows-Eventlog",
             record_id=2004,
+            time_created="2026-03-01T12:04:00.000000Z",
             user_data=(
                 '<UserData><LogFileCleared xmlns="http://schemas.microsoft.com/'
                 'win/2004/08/events"><SubjectUserName>admin</SubjectUserName>'
