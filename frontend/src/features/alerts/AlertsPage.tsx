@@ -322,45 +322,56 @@ export function AlertsPage(): ReactElement {
 
       {rows.length > 0 ? (
         <div className="flex min-h-0 flex-1 flex-col rounded-[var(--radius-card)] border border-border bg-surface">
-          <div role="row" style={{ gridTemplateColumns: GRID }} className="grid items-center gap-2 border-b border-border px-2 py-2">
-            <input
-              type="checkbox"
-              aria-label="Select all on this page"
-              checked={rows.every((row) => selected.has(row.id))}
-              onChange={(event) => {
-                setSelected((current) => {
-                  const next = new Set(current)
-                  for (const row of rows) {
-                    if (event.target.checked) {
-                      next.add(row.id)
-                    } else {
-                      next.delete(row.id)
-                    }
-                  }
-                  return next
-                })
-              }}
-            />
-            <span className="text-xs font-medium uppercase tracking-wide text-muted">Severity</span>
-            <SortHeader column="score" label="Score" state={state} onSort={(column) => { update({ sort: toggleSort(state.sort, ALERT_SORTABLE[column] ?? column) }) }} />
-            <SortHeader column="rule_title" label="Rule" state={state} onSort={(column) => { update({ sort: toggleSort(state.sort, ALERT_SORTABLE[column] ?? column) }) }} />
-            <span className="text-xs font-medium uppercase tracking-wide text-muted">Techniques</span>
-            <span className="text-xs font-medium uppercase tracking-wide text-muted">Host</span>
-            <span className="text-xs font-medium uppercase tracking-wide text-muted">User</span>
-            <SortHeader column="last_seen" label="Last seen" state={state} onSort={(column) => { update({ sort: toggleSort(state.sort, ALERT_SORTABLE[column] ?? column) }) }} />
-            <SortHeader column="match_count" label="Count" state={state} onSort={(column) => { update({ sort: toggleSort(state.sort, ALERT_SORTABLE[column] ?? column) }) }} />
-            <span className="text-xs font-medium uppercase tracking-wide text-muted">Status</span>
-          </div>
-
           <div
             ref={scrollRef}
             role="table"
-            aria-rowcount={total}
+            aria-rowcount={total + 1}
             aria-label="Alerts"
             tabIndex={0}
             onKeyDown={onTableKey}
             className="min-h-0 flex-1 overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
+            <div role="rowgroup" className="sticky top-0 z-10 border-b border-border bg-surface">
+              <div role="row" style={{ gridTemplateColumns: GRID }} className="grid items-center gap-2 px-2 py-2">
+                <div role="columnheader">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all on this page"
+                    checked={rows.every((row) => selected.has(row.id))}
+                    onChange={(event) => {
+                      setSelected((current) => {
+                        const next = new Set(current)
+                        for (const row of rows) {
+                          if (event.target.checked) {
+                            next.add(row.id)
+                          } else {
+                            next.delete(row.id)
+                          }
+                        }
+                        return next
+                      })
+                    }}
+                  />
+                </div>
+                <span role="columnheader" className="text-xs font-medium uppercase tracking-wide text-muted">Severity</span>
+                <div role="columnheader">
+                  <SortHeader column="score" label="Score" state={state} onSort={(column) => { update({ sort: toggleSort(state.sort, ALERT_SORTABLE[column] ?? column) }) }} />
+                </div>
+                <div role="columnheader">
+                  <SortHeader column="rule_title" label="Rule" state={state} onSort={(column) => { update({ sort: toggleSort(state.sort, ALERT_SORTABLE[column] ?? column) }) }} />
+                </div>
+                <span role="columnheader" className="text-xs font-medium uppercase tracking-wide text-muted">Techniques</span>
+                <span role="columnheader" className="text-xs font-medium uppercase tracking-wide text-muted">Host</span>
+                <span role="columnheader" className="text-xs font-medium uppercase tracking-wide text-muted">User</span>
+                <div role="columnheader">
+                  <SortHeader column="last_seen" label="Last seen" state={state} onSort={(column) => { update({ sort: toggleSort(state.sort, ALERT_SORTABLE[column] ?? column) }) }} />
+                </div>
+                <div role="columnheader">
+                  <SortHeader column="match_count" label="Count" state={state} onSort={(column) => { update({ sort: toggleSort(state.sort, ALERT_SORTABLE[column] ?? column) }) }} />
+                </div>
+                <span role="columnheader" className="text-xs font-medium uppercase tracking-wide text-muted">Status</span>
+              </div>
+            </div>
             <div role="rowgroup" style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
               {rowVirtualizer.getVirtualItems().map((item) => {
                 const row = rows[item.index]
@@ -386,28 +397,38 @@ export function AlertsPage(): ReactElement {
                     className={`grid items-center gap-2 border-b border-border px-2 text-sm ${isActive ? 'bg-surface-2' : ''} ${selected.has(row.id) ? 'bg-accent/5' : ''}`}
                     onClick={() => { setActiveIndex(item.index) }}
                   >
-                    <input
-                      type="checkbox"
-                      aria-label={`Select ${row.rule_title}`}
-                      checked={selected.has(row.id)}
-                      onChange={() => { toggleSelected(row.id) }}
-                    />
-                    <SeverityBadge level={row.level} />
-                    <ScoreCell score={row.score} />
-                    <button type="button" className="truncate text-left text-text hover:underline" onClick={() => { update({ alert: row.id }) }}>
-                      {row.rule_title}
-                    </button>
-                    <span className="flex flex-wrap gap-1 overflow-hidden">
+                    <div role="cell">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${row.rule_title}`}
+                        checked={selected.has(row.id)}
+                        onChange={() => { toggleSelected(row.id) }}
+                      />
+                    </div>
+                    <div role="cell">
+                      <SeverityBadge level={row.level} />
+                    </div>
+                    <div role="cell">
+                      <ScoreCell score={row.score} />
+                    </div>
+                    <div role="cell" className="min-w-0">
+                      <button type="button" className="w-full truncate text-left text-text hover:underline" onClick={() => { update({ alert: row.id }) }}>
+                        {row.rule_title}
+                      </button>
+                    </div>
+                    <span role="cell" className="flex flex-wrap gap-1 overflow-hidden">
                       {row.techniques.slice(0, 2).map((technique) => (
                         <span key={technique.id} className="rounded bg-surface-2 px-1 font-mono text-xs text-muted">{technique.id}</span>
                       ))}
                       {row.techniques.length > 2 ? <span className="text-xs text-muted">+{row.techniques.length - 2}</span> : null}
                     </span>
-                    <span className="truncate text-xs text-muted">{row.host ?? '—'}</span>
-                    <span className="truncate text-xs text-muted">{row.user_name ?? '—'}</span>
-                    <span className="truncate text-xs text-muted">{formatTimestamp(row.last_seen_ms)}</span>
-                    <span className="font-mono text-xs text-text">{row.match_count}</span>
-                    <AlertStatusBadge status={row.status} />
+                    <span role="cell" className="truncate text-xs text-muted">{row.host ?? '—'}</span>
+                    <span role="cell" className="truncate text-xs text-muted">{row.user_name ?? '—'}</span>
+                    <span role="cell" className="truncate text-xs text-muted">{formatTimestamp(row.last_seen_ms)}</span>
+                    <span role="cell" className="font-mono text-xs text-text">{row.match_count}</span>
+                    <div role="cell">
+                      <AlertStatusBadge status={row.status} />
+                    </div>
                   </div>
                 )
               })}

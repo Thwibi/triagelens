@@ -139,7 +139,7 @@ function SurroundingEvents({ caseId, event }: { readonly caseId: string; readonl
     <div className="space-y-1 rounded border border-border bg-surface-2/40 p-2">
       <p className="text-xs text-muted">±30s on {event.host ?? 'this host'}</p>
       {query.isPending ? <SkeletonRows rows={2} /> : null}
-      {query.isError ? <p className="text-xs text-sev-critical">Could not load surrounding events.</p> : null}
+      {query.isError ? <p className="text-xs text-sev-critical-text">Could not load surrounding events.</p> : null}
       {query.isSuccess ? (
         query.data.items.length === 0 ? (
           <p className="text-xs text-muted">No nearby events.</p>
@@ -213,7 +213,7 @@ export function EventDrawer({ eventId, onClose }: { readonly eventId: number; re
                     <li key={alert.id} className="flex items-center justify-between gap-2 text-xs">
                       <Link
                         to={`${caseNavPath(caseId ?? '', 'alerts')}?alert=${encodeURIComponent(alert.id)}`}
-                        className="min-w-0 truncate text-accent hover:underline"
+                        className="min-w-0 truncate text-accent-text hover:underline"
                       >
                         {alert.rule_title}
                       </Link>

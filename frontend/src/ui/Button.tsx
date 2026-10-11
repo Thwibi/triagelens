@@ -5,7 +5,7 @@ export type ButtonVariant = 'primary' | 'default' | 'danger' | 'ghost'
 const VARIANT_CLASS: Readonly<Record<ButtonVariant, string>> = {
   primary: 'border-transparent bg-accent text-black hover:opacity-90',
   default: 'border-border bg-surface-2 text-text hover:bg-surface',
-  danger: 'border-sev-critical/60 text-sev-critical hover:bg-sev-critical/10',
+  danger: 'border-sev-critical/60 text-sev-critical-text hover:bg-sev-critical/10',
   ghost: 'border-transparent text-muted hover:bg-surface-2 hover:text-text',
 }
 

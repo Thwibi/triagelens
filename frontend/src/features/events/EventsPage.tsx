@@ -362,11 +362,15 @@ export function EventsPage(): ReactElement {
         </div>
       </div>
 
-      <aside aria-label="Event filters" className="w-64 shrink-0 space-y-4 overflow-auto border-l border-border bg-surface p-3">
+      <aside
+        aria-label="Event filters"
+        tabIndex={0}
+        className="w-64 shrink-0 space-y-4 overflow-auto border-l border-border bg-surface p-3"
+      >
         <div className="flex items-center justify-between">
           <h2 className="text-xs font-medium uppercase tracking-wide text-muted">Facets</h2>
           {active ? (
-            <button type="button" className="text-xs text-accent hover:underline" onClick={() => { update(DEFAULT_EVENT_FILTERS) }}>
+            <button type="button" className="text-xs text-accent-text hover:underline" onClick={() => { update(DEFAULT_EVENT_FILTERS) }}>
               Reset
             </button>
           ) : null}

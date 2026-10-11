@@ -78,7 +78,7 @@ function NewCaseForm({ onDone }: { readonly onDone: (created: Case | null) => vo
           className="rounded-[var(--radius-control)] border border-border bg-surface-2 px-2 py-1 text-text"
         />
       </label>
-      {create.isError ? <p className="text-sm text-sev-critical">Could not create the case.</p> : null}
+      {create.isError ? <p className="text-sm text-sev-critical-text">Could not create the case.</p> : null}
       <div className="flex gap-2">
         <Button type="submit" variant="primary" disabled={!valid || create.isPending}>
           Create case

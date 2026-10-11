@@ -277,7 +277,7 @@ export function MappingWizard({ source, onClose }: MappingWizardProps): ReactEle
                   className="rounded-[var(--radius-control)] border border-border bg-surface-2 px-2 py-1 font-mono text-text"
                 />
                 {draft.name !== '' && !nameValid ? (
-                  <span className="text-xs text-sev-critical">
+                  <span className="text-xs text-sev-critical-text">
                     Use letters, digits, dot, dash or underscore; start alphanumeric.
                   </span>
                 ) : null}
@@ -292,7 +292,7 @@ export function MappingWizard({ source, onClose }: MappingWizardProps): ReactEle
               A saved profile can be the starting point. The suggested match comes from the
               profile&apos;s <code>applies_when</code> keys.
             </p>
-            {loadError !== null ? <p className="text-sm text-sev-critical">{loadError}</p> : null}
+            {loadError !== null ? <p className="text-sm text-sev-critical-text">{loadError}</p> : null}
             {profiles.isPending ? <p className="text-sm text-muted">Loading profiles…</p> : null}
             {profiles.data !== undefined ? (
               <ul className="max-h-64 space-y-1 overflow-auto">
@@ -301,7 +301,7 @@ export function MappingWizard({ source, onClose }: MappingWizardProps): ReactEle
                     <span className="min-w-0 truncate">
                       <span className="font-mono text-text">{profile.name}</span>
                       {profile.name === suggestion ? (
-                        <span className="ml-2 rounded bg-accent/20 px-1 text-xs text-accent">suggested</span>
+                        <span className="ml-2 rounded bg-accent/20 px-1 text-xs text-accent-text">suggested</span>
                       ) : null}
                       {profile.builtin ? <span className="ml-2 text-xs text-muted">builtin</span> : null}
                     </span>
@@ -540,7 +540,7 @@ export function MappingWizard({ source, onClose }: MappingWizardProps): ReactEle
                   </table>
                 </div>
                 {preview.errors.length > 0 ? (
-                  <ul className="space-y-1 text-xs text-sev-medium">
+                  <ul className="space-y-1 text-xs text-sev-medium-text">
                     {preview.errors.map((error) => (
                       <li key={error.record_ref}>
                         {error.record_ref}: {error.reason}

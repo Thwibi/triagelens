@@ -42,9 +42,9 @@ import { SeverityBadge } from '../../ui/Badge'
 const GRID = '3rem minmax(12rem,2fr) 6rem 5rem 10rem 8rem 8rem'
 
 const HEALTH_CLASS: Readonly<Record<string, string>> = {
-  ok: 'text-accent',
-  unroutable: 'text-sev-medium',
-  compile_error: 'text-sev-critical',
+  ok: 'text-accent-text',
+  unroutable: 'text-sev-medium-text',
+  compile_error: 'text-sev-critical-text',
 }
 
 function HealthBadge({ rule }: { readonly rule: Parameters<typeof healthOf>[0] }): ReactElement {
@@ -360,16 +360,24 @@ export function RulesPage(): ReactElement {
 
       {rows.length > 0 ? (
         <div className="flex min-h-0 flex-1 flex-col rounded-[var(--radius-card)] border border-border bg-surface">
-          <div role="row" style={{ gridTemplateColumns: GRID }} className="grid items-center gap-2 border-b border-border px-2 py-2 text-xs font-medium uppercase tracking-wide text-muted">
-            <span>Enabled</span>
-            <span>Title</span>
-            <span>Level</span>
-            <span>Kind</span>
-            <span>Logsource</span>
-            <span>Techniques</span>
-            <span>Health</span>
-          </div>
-          <div className="min-h-0 flex-1 overflow-auto">
+          <div
+            role="table"
+            aria-label="Rules"
+            aria-rowcount={rows.length + 1}
+            tabIndex={0}
+            className="min-h-0 flex-1 overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <div role="rowgroup" className="sticky top-0 z-10 border-b border-border bg-surface">
+              <div role="row" style={{ gridTemplateColumns: GRID }} className="grid items-center gap-2 px-2 py-2 text-xs font-medium uppercase tracking-wide text-muted">
+                <span role="columnheader">Enabled</span>
+                <span role="columnheader">Title</span>
+                <span role="columnheader">Level</span>
+                <span role="columnheader">Kind</span>
+                <span role="columnheader">Logsource</span>
+                <span role="columnheader">Techniques</span>
+                <span role="columnheader">Health</span>
+              </div>
+            </div>
             {rows.map((rule) => {
               const level = toAlertLevel(rule.level)
               return (
@@ -379,24 +387,30 @@ export function RulesPage(): ReactElement {
                   style={{ gridTemplateColumns: GRID }}
                   className="grid items-center gap-2 border-b border-border px-2 py-2 text-sm"
                 >
-                  <input
-                    type="checkbox"
-                    aria-label={`Enable ${rule.title}`}
-                    checked={rule.enabled}
-                    onChange={(event) => { toggle.mutate({ id: rule.id, enabled: event.target.checked }) }}
-                  />
-                  <button
-                    type="button"
-                    className="truncate text-left text-text hover:underline"
-                    onClick={() => { update({ rule: rule.id }) }}
-                  >
-                    {rule.title}
-                  </button>
-                  <span>{level !== null ? <SeverityBadge level={level} /> : <span className="text-xs text-muted">{rule.level}</span>}</span>
-                  <span className="text-xs text-muted">{kindLabel(rule.kind)}</span>
-                  <span className="truncate text-xs text-muted">{logsourceSummary(rule)}</span>
-                  <span className="truncate text-xs text-muted">{ruleTechniques(rule).join(', ') || '—'}</span>
-                  <HealthBadge rule={rule} />
+                  <div role="cell">
+                    <input
+                      type="checkbox"
+                      aria-label={`Enable ${rule.title}`}
+                      checked={rule.enabled}
+                      onChange={(event) => { toggle.mutate({ id: rule.id, enabled: event.target.checked }) }}
+                    />
+                  </div>
+                  <div role="cell" className="min-w-0">
+                    <button
+                      type="button"
+                      className="w-full truncate text-left text-text hover:underline"
+                      onClick={() => { update({ rule: rule.id }) }}
+                    >
+                      {rule.title}
+                    </button>
+                  </div>
+                  <span role="cell">{level !== null ? <SeverityBadge level={level} /> : <span className="text-xs text-muted">{rule.level}</span>}</span>
+                  <span role="cell" className="text-xs text-muted">{kindLabel(rule.kind)}</span>
+                  <span role="cell" className="truncate text-xs text-muted">{logsourceSummary(rule)}</span>
+                  <span role="cell" className="truncate text-xs text-muted">{ruleTechniques(rule).join(', ') || '—'}</span>
+                  <div role="cell">
+                    <HealthBadge rule={rule} />
+                  </div>
                 </div>
               )
             })}

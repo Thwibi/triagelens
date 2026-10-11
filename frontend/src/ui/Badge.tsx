@@ -5,11 +5,11 @@ import type { LucideIcon } from 'lucide-react'
 import type { AlertLevel, AlertStatus, AnalystState } from '../api/types'
 
 const SEVERITY: Readonly<Record<AlertLevel, { readonly label: string; readonly icon: LucideIcon; readonly className: string }>> = {
-  critical: { label: 'Critical', icon: ShieldAlert, className: 'text-sev-critical' },
-  high: { label: 'High', icon: AlertTriangle, className: 'text-sev-high' },
-  medium: { label: 'Medium', icon: AlertCircle, className: 'text-sev-medium' },
-  low: { label: 'Low', icon: Info, className: 'text-sev-low' },
-  informational: { label: 'Info', icon: MinusCircle, className: 'text-sev-info' },
+  critical: { label: 'Critical', icon: ShieldAlert, className: 'text-sev-critical-text' },
+  high: { label: 'High', icon: AlertTriangle, className: 'text-sev-high-text' },
+  medium: { label: 'Medium', icon: AlertCircle, className: 'text-sev-medium-text' },
+  low: { label: 'Low', icon: Info, className: 'text-sev-low-text' },
+  informational: { label: 'Info', icon: MinusCircle, className: 'text-sev-info-text' },
 }
 
 /**
@@ -32,10 +32,10 @@ export type StatusTone = 'neutral' | 'progress' | 'ok' | 'warn' | 'error'
 
 const TONE_CLASS: Readonly<Record<StatusTone, string>> = {
   neutral: 'text-muted',
-  progress: 'text-sev-low',
-  ok: 'text-accent',
-  warn: 'text-sev-medium',
-  error: 'text-sev-critical',
+  progress: 'text-sev-low-text',
+  ok: 'text-accent-text',
+  warn: 'text-sev-medium-text',
+  error: 'text-sev-critical-text',
 }
 
 const SOURCE_STATUS: Readonly<Record<string, { readonly label: string; readonly tone: StatusTone }>> = {

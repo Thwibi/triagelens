@@ -31,6 +31,19 @@
   --color-sev-medium: var(--sev-medium);
   --color-sev-low: var(--sev-low);
   --color-sev-info: var(--sev-info);
+
+  /*
+   * Text-only variants. The palette above is correct for icons, dots, rings and
+   * tints, but several of its light-theme values fall below WCAG AA (4.5:1) as
+   * small text on lighter surfaces. These darker light-theme variants are used
+   * wherever a colour marks text; dark theme reuses the base palette.
+   */
+  --color-accent-text: var(--accent-text);
+  --color-sev-critical-text: var(--sev-critical-text);
+  --color-sev-high-text: var(--sev-high-text);
+  --color-sev-medium-text: var(--sev-medium-text);
+  --color-sev-low-text: var(--sev-low-text);
+  --color-sev-info-text: var(--sev-info-text);
 }
 
 :root {
@@ -47,6 +60,12 @@
   --sev-medium: #eab308;
   --sev-low: #38bdf8;
   --sev-info: #94a3b8;
+  --accent-text: #2dd4bf;
+  --sev-critical-text: #f43f5e;
+  --sev-high-text: #f97316;
+  --sev-medium-text: #eab308;
+  --sev-low-text: #38bdf8;
+  --sev-info-text: #94a3b8;
 }
 
 [data-theme='light'] {
@@ -63,6 +82,12 @@
   --sev-medium: #b98a00;
   --sev-low: #1d8fd0;
   --sev-info: #64748b;
+  --accent-text: #0f6e66;
+  --sev-critical-text: #be123c;
+  --sev-high-text: #9a3412;
+  --sev-medium-text: #806000;
+  --sev-low-text: #0369a1;
+  --sev-info-text: #475569;
 }
 
 html,

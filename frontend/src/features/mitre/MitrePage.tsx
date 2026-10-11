@@ -113,7 +113,7 @@ function TechniqueCell({
           title={`${node.id} ${node.name} — ${formatNumber(node.cell.count)} alerts`}
           className="min-w-0 flex-1 truncate text-left text-xs hover:underline"
         >
-          <span className="font-mono text-muted">{node.id}</span> <span className="text-text">{node.name}</span>
+          <span className="font-mono text-text">{node.id}</span> <span className="text-text">{node.name}</span>
         </Link>
         {node.cell.count > 0 ? <span className="font-mono text-xs text-text">{node.cell.count}</span> : null}
       </div>
@@ -126,7 +126,7 @@ function TechniqueCell({
                 title={`${child.id} ${child.name} — ${formatNumber(child.cell.count)} alerts`}
                 className="min-w-0 flex-1 truncate text-xs hover:underline"
               >
-                <span className="font-mono text-muted">{child.id}</span> <span className="text-text">{child.name}</span>
+                <span className="font-mono text-text">{child.id}</span> <span className="text-text">{child.name}</span>
               </Link>
               {child.cell.count > 0 ? <span className="font-mono text-xs text-text">{child.cell.count}</span> : null}
             </li>
@@ -305,7 +305,7 @@ export function MitrePage(): ReactElement {
       </div>
 
       {unmapped > 0 ? (
-        <p className="text-xs text-sev-medium">
+        <p className="text-xs text-sev-medium-text">
           {formatNumber(unmapped)} alert{unmapped === 1 ? '' : 's'} have no ATT&CK technique and are not shown on the matrix.
         </p>
       ) : null}

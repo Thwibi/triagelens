@@ -3,6 +3,42 @@
 Each entry records a decision that is not obvious from the code, why it was
 made, and what it costs. Newest first. Dates are ISO-8601.
 
+## 2026-10-11 — Accessibility gate (axe-core) and the AA text tokens
+
+**Decision.** The spec 07 "Lighthouse accessibility = 95" clause is realised as an
+axe-core WCAG 2.1 A/AA scan of the thirteen main screens
+(`frontend/e2e/a11y.spec.ts`, `@axe-core/playwright`), which fails on any serious
+or critical violation. It runs inside the existing `e2e` task rather than a
+separate Lighthouse harness, because axe-core is a deterministic, offline,
+CI-friendly equivalent with no external browser channel. Because the spec pins a
+light-theme palette whose accent and severity hexes are below the 4.5:1 AA text
+ratio, six darker `*-text` tokens were added (`--accent-text`,
+`--sev-{critical,high,medium,low,info}-text`) used only for text on tinted or
+light surfaces; icons, dots, rings and tints keep the spec's exact hexes, so the
+palette and the "icon + label + colour, never colour alone" rule are preserved.
+
+Three fixes the scan surfaced:
+
+1. **The Status, health and 404 screens moved off raw `slate-*` classes onto the
+   theme tokens**, which is what had produced the original 26 contrast nodes.
+2. **The virtualized Alerts, IOCs and Rules tables now carry real table
+   semantics** — `role="table"` on the scroll region with `aria-rowcount`, sticky
+   `role="rowgroup"` headers, and `role="columnheader"`/`role="cell"` children —
+   satisfying spec 07 §6.
+3. **Focusable scroll regions and a non-image chart wrapper**: the Events filter
+   aside became `tabIndex={0}`, and the Recharts timeline wrapper changed from
+   `role="img"` to `role="group"` so the Brush travellers are no longer a nested
+   interactive control.
+
+**Why.** Spec 00 requires every MUST to be covered by a test; spec 07 §6 and the
+accessibility clause are normative. Leaving them would keep the requirement
+Partial.
+
+**Cost.** The scan is part of the Playwright suite, so it needs a built frontend
+and a Chromium install like the scenarios. It asserts serious/critical only (not
+every advisory rule), and it measures axe's rule set rather than Lighthouse's
+exact score.
+
 ## 2026-10-11 — Browser E2E for Scenarios A/B/C, and the Scenario C fixture rebuild
 
 **Decision.** The spec 09 §7 acceptance is now exercised end to end through the

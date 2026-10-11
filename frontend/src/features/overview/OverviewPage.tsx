@@ -211,7 +211,7 @@ function IngestHealth(): ReactElement {
         return (
           <li key={source.id} className="flex items-center justify-between gap-2 text-sm">
             <span className="truncate text-text">{source.filename}</span>
-            <span className={rate > 0 ? 'text-sev-medium' : 'text-muted'}>{formatPercent(rate)} errors</span>
+            <span className={rate > 0 ? 'text-sev-medium-text' : 'text-muted'}>{formatPercent(rate)} errors</span>
           </li>
         )
       })}

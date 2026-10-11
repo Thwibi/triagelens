@@ -79,10 +79,10 @@ function AttackBlock({ detail }: { readonly detail: AlertDetail }): ReactElement
           <ul className="flex flex-wrap gap-1">
             {detail.techniques.map((technique) => (
               <li key={technique.id} className="inline-flex items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 text-xs">
-                <a className="font-mono text-accent hover:underline" href={`${mitreHref}${mitreHref.includes('?') ? '&' : '?'}technique=${encodeURIComponent(technique.id)}`}>
+                <a className="font-mono text-accent-text hover:underline" href={`${mitreHref}${mitreHref.includes('?') ? '&' : '?'}technique=${encodeURIComponent(technique.id)}`}>
                   {technique.id} {technique.name}
                 </a>
-                {technique.source === 'fallback' ? <span className="rounded bg-sev-medium/20 px-1 text-[10px] text-sev-medium">inferred</span> : null}
+                {technique.source === 'fallback' ? <span className="rounded bg-sev-medium/20 px-1 text-[10px] text-sev-medium-text">inferred</span> : null}
                 <a className="text-muted hover:text-text" href={attackUrl(technique.id)} target="_blank" rel="noopener noreferrer" aria-label={`Open ${technique.id} on attack.mitre.org`}>
                   <ExternalLink aria-hidden="true" size={12} />
                 </a>
@@ -109,7 +109,7 @@ function AttackBlock({ detail }: { readonly detail: AlertDetail }): ReactElement
           </ul>
         ) : null}
         {detail.unresolved_tags.length > 0 ? (
-          <p className="text-xs text-sev-medium">Unresolved tags: {detail.unresolved_tags.join(', ')}</p>
+          <p className="text-xs text-sev-medium-text">Unresolved tags: {detail.unresolved_tags.join(', ')}</p>
         ) : null}
         {offline ? <p className="text-xs text-muted">Offline: external ATT&CK links are shown but not reachable.</p> : null}
       </div>
@@ -208,7 +208,7 @@ function EvidenceBlock({ detail }: { readonly detail: AlertDetail }): ReactEleme
           </ul>
         )}
         {all.isPending ? <SkeletonRows rows={2} /> : null}
-        {all.isError ? <p className="text-xs text-sev-critical">Could not load all matches.</p> : null}
+        {all.isError ? <p className="text-xs text-sev-critical-text">Could not load all matches.</p> : null}
         {extra.length > 0 ? (
           <ul className="space-y-1">
             {extra.map((event) => (

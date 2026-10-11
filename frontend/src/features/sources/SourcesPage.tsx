@@ -166,7 +166,7 @@ function NeedsInputPrompt({ source }: { readonly source: Source }): ReactElement
   }
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 rounded bg-sev-medium/10 p-2 text-sm">
-      <span className="text-sev-medium">Which log type is this?</span>
+      <span className="text-sev-medium-text">Which log type is this?</span>
       <label className="flex items-center gap-1">
         <span className="sr-only">Log type</span>
         <input

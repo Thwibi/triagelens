@@ -157,7 +157,7 @@ export function TimelinePage(): ReactElement {
       ) : data.length === 0 ? (
         <EmptyState title="No events in range" detail="Import a log source to populate the timeline." />
       ) : (
-        <div className="h-72 w-full" role="img" aria-label="Event volume over time by log type with alert markers">
+        <div className="h-72 w-full" role="group" aria-label="Event volume over time by log type with alert markers">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -12 }}>
               <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
@@ -214,7 +214,7 @@ export function TimelinePage(): ReactElement {
                 <li key={alert.id} className="flex items-center justify-between gap-2 border-b border-border/60 pb-1 text-sm">
                   <Link
                     to={`${caseNavPath(caseId, 'alerts')}?alert=${encodeURIComponent(alert.id)}`}
-                    className="min-w-0 truncate text-accent hover:underline"
+                    className="min-w-0 truncate text-accent-text hover:underline"
                   >
                     {alert.rule_title}
                   </Link>

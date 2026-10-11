@@ -35,7 +35,7 @@ function OccurrenceRow({ occurrence }: { readonly occurrence: IocOccurrence }): 
         <span className="font-mono text-muted">{formatTimestamp(occurrence.ts_ms)}</span>
         <span className="flex items-center gap-1">
           {occurrence.decoded_from !== null ? (
-            <span className="rounded bg-sev-medium/20 px-1 text-[10px] text-sev-medium" title={`Decoded from ${occurrence.decoded_from}`}>
+            <span className="rounded bg-sev-medium/20 px-1 text-[10px] text-sev-medium-text" title={`Decoded from ${occurrence.decoded_from}`}>
               decoded
             </span>
           ) : null}
@@ -193,7 +193,7 @@ export function IocDrawer({ iocId, onClose }: { readonly iocId: string; readonly
                 {caseId !== null ? (
                   <Link
                     to={`${caseNavPath(caseId, 'events')}?ioc_id=${encodeURIComponent(iocId)}`}
-                    className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
+                    className="inline-flex items-center gap-1 text-xs text-accent-text hover:underline"
                   >
                     Pivot to Events filtered by this indicator
                     <ExternalLink aria-hidden="true" size={12} />

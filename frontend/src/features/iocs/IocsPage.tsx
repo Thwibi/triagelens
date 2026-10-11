@@ -309,34 +309,52 @@ export function IocsPage(): ReactElement {
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col rounded-[var(--radius-card)] border border-border bg-surface">
-            <div role="row" style={{ gridTemplateColumns: GRID }} className="grid items-center gap-2 border-b border-border px-2 py-2">
-              <input
-                type="checkbox"
-                aria-label="Select all on this page"
-                checked={rows.length > 0 && rows.every((row) => selected.has(row.id))}
-                onChange={(event) => {
-                  setSelected((current) => {
-                    const next = new Set(current)
-                    for (const row of rows) {
-                      if (event.target.checked) {
-                        next.add(row.id)
-                      } else {
-                        next.delete(row.id)
-                      }
-                    }
-                    return next
-                  })
-                }}
-              />
-              <span className="text-xs font-medium uppercase tracking-wide text-muted">Value</span>
-              <span className="text-xs font-medium uppercase tracking-wide text-muted">Type</span>
-              <SortHeader column="confidence" label="Confidence" state={state} onSort={onSort} />
-              <SortHeader column="occurrences" label="Count" state={state} onSort={onSort} />
-              <SortHeader column="first_seen" label="First seen" state={state} onSort={onSort} />
-              <SortHeader column="last_seen" label="Last seen" state={state} onSort={onSort} />
-              <span className="text-xs font-medium uppercase tracking-wide text-muted">State</span>
-            </div>
-            <div role="table" aria-label="Indicators" className="min-h-0 flex-1 overflow-auto">
+            <div
+              role="table"
+              aria-label="Indicators"
+              aria-rowcount={rows.length + 1}
+              tabIndex={0}
+              className="min-h-0 flex-1 overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              <div role="rowgroup" className="sticky top-0 z-10 border-b border-border bg-surface">
+                <div role="row" style={{ gridTemplateColumns: GRID }} className="grid items-center gap-2 px-2 py-2">
+                  <div role="columnheader">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all on this page"
+                      checked={rows.length > 0 && rows.every((row) => selected.has(row.id))}
+                      onChange={(event) => {
+                        setSelected((current) => {
+                          const next = new Set(current)
+                          for (const row of rows) {
+                            if (event.target.checked) {
+                              next.add(row.id)
+                            } else {
+                              next.delete(row.id)
+                            }
+                          }
+                          return next
+                        })
+                      }}
+                    />
+                  </div>
+                  <span role="columnheader" className="text-xs font-medium uppercase tracking-wide text-muted">Value</span>
+                  <span role="columnheader" className="text-xs font-medium uppercase tracking-wide text-muted">Type</span>
+                  <div role="columnheader">
+                    <SortHeader column="confidence" label="Confidence" state={state} onSort={onSort} />
+                  </div>
+                  <div role="columnheader">
+                    <SortHeader column="occurrences" label="Count" state={state} onSort={onSort} />
+                  </div>
+                  <div role="columnheader">
+                    <SortHeader column="first_seen" label="First seen" state={state} onSort={onSort} />
+                  </div>
+                  <div role="columnheader">
+                    <SortHeader column="last_seen" label="Last seen" state={state} onSort={onSort} />
+                  </div>
+                  <span role="columnheader" className="text-xs font-medium uppercase tracking-wide text-muted">State</span>
+                </div>
+              </div>
               {rows.map((ioc) => {
                 const shown = state.defang ? defang(ioc.value) : ioc.value
                 return (
@@ -346,13 +364,15 @@ export function IocsPage(): ReactElement {
                     style={{ gridTemplateColumns: GRID }}
                     className={`grid items-center gap-2 border-b border-border px-2 py-2 text-sm ${selected.has(ioc.id) ? 'bg-accent/5' : ''}`}
                   >
-                    <input
-                      type="checkbox"
-                      aria-label={`Select ${ioc.value}`}
-                      checked={selected.has(ioc.id)}
-                      onChange={() => { toggleSelected(ioc.id) }}
-                    />
-                    <span className="flex min-w-0 items-center gap-1">
+                    <div role="cell">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${ioc.value}`}
+                        checked={selected.has(ioc.id)}
+                        onChange={() => { toggleSelected(ioc.id) }}
+                      />
+                    </div>
+                    <span role="cell" className="flex min-w-0 items-center gap-1">
                       <button
                         type="button"
                         className="min-w-0 truncate text-left font-mono text-text hover:underline"
@@ -363,12 +383,16 @@ export function IocsPage(): ReactElement {
                       </button>
                       <CopyButton value={state.defang ? defang(ioc.value) : ioc.value} label={`Copy ${ioc.type}`} />
                     </span>
-                    <span className="font-mono text-xs text-muted">{ioc.type}</span>
-                    <ConfidenceBar value={ioc.confidence} />
-                    <span className="font-mono text-xs text-text">{formatNumber(ioc.occurrences)}</span>
-                    <span className="truncate text-xs text-muted">{formatTimestamp(ioc.first_seen_ms)}</span>
-                    <span className="truncate text-xs text-muted">{formatTimestamp(ioc.last_seen_ms)}</span>
-                    <AnalystStateBadge state={ioc.analyst_state} />
+                    <span role="cell" className="font-mono text-xs text-muted">{ioc.type}</span>
+                    <div role="cell">
+                      <ConfidenceBar value={ioc.confidence} />
+                    </div>
+                    <span role="cell" className="font-mono text-xs text-text">{formatNumber(ioc.occurrences)}</span>
+                    <span role="cell" className="truncate text-xs text-muted">{formatTimestamp(ioc.first_seen_ms)}</span>
+                    <span role="cell" className="truncate text-xs text-muted">{formatTimestamp(ioc.last_seen_ms)}</span>
+                    <div role="cell">
+                      <AnalystStateBadge state={ioc.analyst_state} />
+                    </div>
                   </div>
                 )
               })}

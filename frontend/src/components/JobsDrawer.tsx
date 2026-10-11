@@ -43,7 +43,7 @@ function JobRow({ job }: { readonly job: Job }): ReactElement {
       {job.status === 'running' || job.status === 'queued' ? <JobProgress value={progress} label={job.kind} /> : null}
       <p className="text-xs text-muted">
         {stage?.stage !== undefined ? `${stage.stage} · ${stage.rateEps.toFixed(0)}/s` : job.message ?? ''}
-        {job.error !== null ? <span className="text-sev-critical"> {job.error}</span> : null}
+        {job.error !== null ? <span className="text-sev-critical-text"> {job.error}</span> : null}
       </p>
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted">{formatSince(Date.parse(job.created_at))}</span>
@@ -105,7 +105,7 @@ export function JobsDrawer(): ReactElement | null {
       </div>
       <div className="flex-1 overflow-auto p-3">
         {jobsQuery.isPending ? <SkeletonRows rows={4} /> : null}
-        {jobsQuery.isError ? <p className="text-sm text-sev-critical">Could not load jobs.</p> : null}
+        {jobsQuery.isError ? <p className="text-sm text-sev-critical-text">Could not load jobs.</p> : null}
         {jobsQuery.data !== undefined ? (
           jobsQuery.data.items.length === 0 ? (
             <p className="text-sm text-muted">No jobs yet for this case.</p>

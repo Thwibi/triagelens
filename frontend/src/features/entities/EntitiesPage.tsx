@@ -48,7 +48,7 @@ function EntityTable({
                 <td className="py-1 pr-2">
                   <Link
                     to={`${caseNavPath(caseId, 'events')}?${filterKey}=${encodeURIComponent(entity.name)}`}
-                    className="font-mono text-accent hover:underline"
+                    className="font-mono text-accent-text hover:underline"
                   >
                     {entity.name}
                   </Link>

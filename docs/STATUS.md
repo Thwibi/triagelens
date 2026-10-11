@@ -74,10 +74,11 @@ environment are in `docs/COMPLIANCE.md`; the open gaps are listed below.
 - `docs/perf-results.md` is refreshed (2026-10-11) but the spec 09 §8 end-to-end
   targets (multi-worker throughput, 1M-event detection, 5M-event p95, UI paint,
   10 GB ingest memory) are not measured by the harness.
-- The final verification (9f) could not run everything here: the Lighthouse a11y
-  and bundle-size checks, and the clean-machine offline install, are unrun. The
-  browser E2E suite was added afterwards (`frontend/e2e/`, four Playwright tests).
-  The unrun checks are itemised in `docs/COMPLIANCE.md` and `docs/DECISIONS.md`.
+- The final verification (9f) could not run everything here: the clean-machine
+  offline install is unrun. The browser E2E suite (`frontend/e2e/`, five
+  Playwright tests including the axe-core a11y scan) and the bundle-size budget
+  were added afterwards. The remaining unrun check is itemised in
+  `docs/COMPLIANCE.md` and `docs/DECISIONS.md`.
 - The optional IOC enrichment (spec 05 §9) is not implemented: `allow_enrichment`
   is a reserved flag surfaced only in `/api/health`, so there is no network
   client to gate. A full ingest → detect → report run opening zero non-loopback
@@ -180,10 +181,11 @@ service it needs; see the 2026-10-10 decision.
   Vacuum, Rebuild-search-index, Verify-evidence-hashes and Verify-audit-chain
   actions were added in phase 9 slice 9d. The audit viewer is case-scoped
   (`GET /cases/{id}/audit-log`), so it asks for a case.
-- Screenshots and the Lighthouse accessibility check are still absent; the browser
-  E2E suite (`frontend/e2e/`, spec 09 §7 scenarios + the S-02 render check) and
-  the spec 07 < 1.5 MB gzipped bundle budget (`frontend-budget` task) now run, but
-  the Lighthouse a11y ≥ 95 check is unmeasured.
+- Screenshots are still absent; the browser E2E suite (`frontend/e2e/`, spec 09 §7
+  scenarios + the S-02 render check + an axe-core WCAG 2.1 A/AA scan of the main
+  screens) and the spec 07 < 1.5 MB gzipped bundle budget (`frontend-budget` task)
+  both run. The literal Lighthouse ≥ 95 tool is unmeasured; the axe-core scan is
+  its deterministic equivalent.
 
 ## Phase 6 — Detection engine (implemented)
 

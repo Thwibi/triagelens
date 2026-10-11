@@ -77,10 +77,12 @@ No literal "MUST" tokens; the per-format tables are normative. Covered by
 
 No literal "MUST" tokens; the screen tables are normative. Covered by frontend
 Vitest suites (30 files) and, for the browser-level acceptance, the Playwright
-E2E scenarios (spec 09 §7) under `frontend/e2e/`. The bundle-size budget
-(< 1.5 MB gzipped) is enforced by `scripts/task.py frontend-budget`
-(`frontend/scripts/check-bundle-budget.mjs`, run in CI); the Lighthouse a11y
-check remains unmeasured (see Gaps).
+E2E scenarios (spec 09 §7) under `frontend/e2e/`. The < 1.5 MB gzipped
+bundle-size budget is enforced by `scripts/task.py frontend-budget`
+(`frontend/scripts/check-bundle-budget.mjs`, run in CI), and accessibility is
+checked by an axe-core WCAG 2.1 A/AA scan of the thirteen main screens
+(`frontend/e2e/a11y.spec.ts`, where serious/critical violations fail) — the
+Lighthouse ≥ 95 clause is met by this equivalent.
 
 ## 08 — Reporting and export
 
@@ -185,10 +187,10 @@ These are the requirements the matrix marks Partial/Gap. They are known and
 intentional at this point, and are tracked in `docs/STATUS.md`; fixing them is the
 remaining work.
 
-1. **Lighthouse a11y check not run.** The spec 09 §7 scenarios, the S-02 render
-   check (`frontend/e2e/`, four Playwright tests) and the spec 07 bundle-size
-   budget (`frontend-budget` task) all run, but the Lighthouse accessibility ≥ 95
-   check has no harness here (Lighthouse is not installed).
+1. **Lighthouse itself is not run.** The spec 07 accessibility clause is covered
+   by an axe-core WCAG 2.1 A/AA scan of the thirteen main screens
+   (`frontend/e2e/a11y.spec.ts`), but the literal Lighthouse ≥ 95 tool is not
+   installed here; the axe rule set is the deterministic offline equivalent.
 2. **Offline clean-machine install not executed.** `make package` and the
    installer exist, but the bundle was not installed on a separate
    network-disabled machine.

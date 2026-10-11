@@ -207,7 +207,7 @@ function AuditViewer({ caseId }: { readonly caseId: string | null }): ReactEleme
         <ErrorPanel title="Cannot load audit log" message="The audit chain could not be read." onRetry={() => { void audit.refetch() }} />
       ) : (
         <>
-          <p className={`text-xs font-medium ${audit.data.chain_ok ? 'text-accent' : 'text-sev-critical'}`}>
+          <p className={`text-xs font-medium ${audit.data.chain_ok ? 'text-accent-text' : 'text-sev-critical-text'}`}>
             {audit.data.chain_ok
               ? `Chain verified · ${formatNumber(audit.data.rows_checked)} rows`
               : `Chain broken at row ${formatNumber(audit.data.broken_at ?? 0)}: ${audit.data.broken_reason ?? 'unknown'}`}
