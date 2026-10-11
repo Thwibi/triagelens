@@ -2,6 +2,243 @@
 
 What works today, and what does not. Updated at the end of each phase.
 
+## Phase 9 - Reporting, export, packaging and hardening (complete; open gaps recorded)
+
+The spec 11 phase 9 build. Slices **9a (report service and endpoints)**,
+**9b (streamed event CSV/JSONL export)**, **9c (Reports screen + Events
+export wiring)**, **9d (backup/diagnostics scripts, disk guards, secure
+delete and the Data-maintenance screens)**, **9e (README and the manual
+validation guide)** and **9f (final verification)** are implemented. The
+verification outcome and every requirement that could not be checked in this
+environment are in `docs/COMPLIANCE.md`; the open gaps are listed below.
+
+| Area | State |
+|---|---|
+| Report model | `app/reports/model.py`: one neutral dataclass tree (`ReportMeta`, `ReportSummary`, `ReportAlert`, `ReportIoc`, sources, runs, integrity) with `as_dict()` carrying `schema_version`; every format renders from this one model (spec 08 §1) |
+| Options | `app/reports/options.py`: `ReportOptions` + `options_from_dict`; `alerts` absent means every status, an explicit empty list turns the alert sections off; `events_per_alert` bounded to 50; unknown format/status is a 422 |
+| Gather | `app/reports/gather.py`: `gather_report` reads cases, alerts (paged, filtered by status), alert detail with evidence and per-alert IOCs, MITRE matrix + Navigator layer, timeline buckets, entities, source integrity and the audit-chain verification, on a read connection |
+| Render | `app/reports/render.py`: JSON, GitHub-flavoured Markdown (widened fences, pipe-escaped cells), self-contained HTML (Jinja2 template `templates/report.html.j2`, inline CSS, inline SVG timeline + MITRE heat-grid, **autoescape on**, no JS and no external requests), PDF via WeasyPrint when installed, and the alert-overview CSV with the formula-injection guard |
+| Service | `app/reports/service.py`: `generate_report` writes `reports_dir/<case_id>/<id>.<ext>`, records `reports` (path, sha256, options JSON) and appends a `report_created` audit row — all inside the writer transaction; `report_file` re-hashes the bytes against the recorded SHA-256 on download |
+| Job | `app/jobs/report.py`: `ReportRunner`, registered for `JobKind.REPORT` in `main.py`, gathers + renders + writes on the single writer thread and publishes `gathering`/`rendering` stages |
+| API | `app/api/routers/reports.py`: `POST /cases/{id}/reports` (202 job; PDF without WeasyPrint → `422 PDF_UNAVAILABLE`; unknown format → 422; unknown case → 404), `GET /cases/{id}/reports` (newest first + total), `GET /reports/{id}/download` (`Content-Disposition` + `X-SHA256`, re-hashed), `GET /cases/{id}/reports/alerts.csv` (bounded pages, `X-Total`, formula guard) |
+| Export module | `app/reports/export.py`: `iter_events_export` walks the current filter result in keyset pages and yields text chunks, CSV with every normalized column + `fields_json` as a JSON string and JSONL with parsed `fields`; bounded by `max_rows` (1M) so no case lands in memory (spec 08 §4, spec 06 §5, spec 07 §3.7) |
+| Export endpoint | `GET /cases/{id}/events/export?format=csv\|jsonl` in `app/api/routers/events.py`: the same filters as the events list, streamed; invalid FTS syntax → 422 before the body starts; unknown case → 404; unknown format → 422 |
+| CSV guard | `app/util/csv.py`: one `safe_cell` (prefix `'` for `= + - @ \t \r`) shared by the report alert CSV and the event export (spec 10 §1) |
+| Reports UI | `features/reports/ReportsPage.tsx`: spec 07 §3.12 options form (format with PDF gated on `health.pdf_available`, title, analyst, alert-status checkboxes, events per alert 0–50, IOC/ATT&CK/timeline/entities/raw-appendix toggles), generate → `POST /cases/{id}/reports`, a history table (created, format, truncated SHA-256 with copy, download) and an HTML preview in a `sandbox=""` (scripts-off) iframe via `GET /reports/{id}/download`; the report list refreshes when a `report` job finishes (JobsProvider → `invalidateReports`) |
+| Events export UI | `features/events/EventsPage.tsx`: the CSV/JSONL buttons now stream the current filter result from `GET /cases/{id}/events/export` (via `exportEvents`, 5-minute timeout, toast) instead of serialising the loaded rows client-side |
+| Disk guard | `app/ingest/archive.py`: `ensure_disk_space` refuses an ingest when the free space is under 3× the incoming bytes or below `limits.min_free_disk_fraction` (5% default), raising `INSUFFICIENT_STORAGE` (507); `app/ingest/intake.py` calls it before storing, probing the nearest existing ancestor of `data_dir` (spec 10 §1) |
+| Secure delete | `app/ingest/intake.py`: `remove_stored(dir, secure=)` zeroes each file in place (then `fsync`) before unlinking when `storage.secure_delete` is set; the read-only directory is made writable first so deletion succeeds on Windows (spec 10 §3) |
+| Delete audit & tombstone | `DELETE /cases/{id}` (now `204`) and `DELETE /sources/{id}` append `case_deleted`/`source_deleted` audit rows inside the writer transaction; the case delete also records `audit_tombstones` (last hash + row count) and removes `data/cases/<id>/` and `data/reports/<id>/` after the DB commit (spec 02 §4, spec 06, spec 10 §2) |
+| Maintenance API | `app/api/routers/maintenance.py`: `POST /maintenance/vacuum` (VACUUM on the writer thread without a surrounding transaction, returning byte size before/after), `/maintenance/rebuild-fts` (rebuild the `events_fts` index), `/maintenance/verify-hashes` (re-hash every stored original) and `/maintenance/verify-audit` (walk the chain). Not in spec 06; see DECISIONS |
+| Maintenance UI | `features/settings/SettingsPage.tsx`: the Data section gains Vacuum, Rebuild search index, Verify evidence hashes and Verify audit chain buttons, each reporting its outcome in a toast; vacuuming refreshes the health figures |
+| Backup script | `scripts/backup.py <case_id\|all> <dest>`: a zip with `VACUUM INTO` database snapshot, the case(s) `cases/`+`reports/` trees and a `manifest.json` of per-file SHA-256 + byte size; refuses a case id the DB does not know and a destination without room (spec 10 §5) |
+| Diagnostics script | `scripts/diag.py`: versions, the effective config with secret-looking keys masked, the log tail and an optional live `/api/health` probe; never reads event content (spec 10 §5) |
+| Docs | `README.md` updated from its Phase 0 state to describe the completed application, the end-to-end usage flow and the backup/diagnostics/maintenance tools; `docs/validation.md` adds the spec 09 §2 manual procedure for validating against public datasets (EVTX-ATTACK-SAMPLES, OTRF Mordor, Hayabusa, loghub). `SOURCES.md` and `THIRD_PARTY_NOTICES.md` were already in place (9e) |
+| Compliance | `docs/COMPLIANCE.md`: every normative requirement in spec 00-10 mapped to the code that implements it and the test that covers it, with a status per row and the open gaps listed explicitly (9f) |
+| Tests | `tests/test_reports.py`: runner writes an escaped, self-contained HTML file whose bytes match the recorded hash; the API flow enqueues → lists → downloads JSON; PDF answers 422; validation; CSV guard; two gathers of a case are identical given a fixed timestamp. `tests/test_events_export.py`: CSV column set/guard/round-trip through `csv`, JSONL shape, filters and the row cap, validation, and multi-page streaming of `iter_events_export`. `tests/test_maintenance.py`: verify-hashes ok/tampered/missing, FTS rebuild, vacuum, audit verification. `tests/test_case_delete.py`: `204` + audit row + tombstone + directory removal, and source-delete audit. `tests/test_disk_guard.py`: the headroom and floor rules. Frontend: `ReportsPage.test.tsx` (history, form POST body, sandboxed preview, PDF disabled), `EventsPage.test.tsx` export wiring, `JobsProvider.test.tsx` report invalidation, `SettingsPage.test.tsx` maintenance actions |
+
+### Verification
+
+| Gate | Command | Result |
+|---|---|---|
+| Backend lint | `.venv\Scripts\python.exe scripts\task.py backend-lint` | clean (ruff check + format check, 195 files) |
+| Backend types | `.venv\Scripts\python.exe scripts\task.py backend-typecheck` | clean (mypy, 209 source files) |
+| Backend tests | `.venv\Scripts\python.exe scripts\task.py backend-test` | 1818 passed, 1 skipped |
+| Backend coverage | `.venv\Scripts\python.exe scripts\task.py backend-coverage` | 89.56% overall (80% floor met); `parsers` 88%, `detect` 92%, `ioc` 93%, `mitre` 94% — all four spec 00 packages ≥ 85% (vendored `evtxlib/` omitted, as from ruff/mypy) |
+| Scripts lint | `.venv\Scripts\python.exe scripts\task.py scripts-lint` | clean (ruff check + format check, 11 files) |
+| Frontend lint | `npx --no-install eslint . --max-warnings 0` (in `frontend/`) | clean |
+| Frontend types | `npx --no-install tsc --build --force` (in `frontend/`) | clean |
+| Frontend tests | `npx --no-install vitest --run` (in `frontend/`) | 232 passed (30 files) |
+| Benchmarks | `.venv\Scripts\python.exe scripts\task.py perf` | 15 primitive benchmarks, refreshed `docs/perf-results.md` |
+| Audits | `npm audit --audit-level=high` (in `frontend/`) | 0 vulnerabilities; `pip-audit` is wired into `.github/workflows/ci.yml` but not run here (not installed) |
+| CI | `.github/workflows/ci.yml` | backend lint/typecheck/coverage, frontend lint/typecheck/test/`npm audit`, and a `pip-audit` job; not yet executed on a runner |
+
+### Known limitations
+
+- PDF is an optional feature: with WeasyPrint absent the endpoint answers
+  `422 PDF_UNAVAILABLE` and the format is not generated (spec 08 §2). WeasyPrint is
+  not installed in this environment; the Reports screen disables the PDF option and
+  explains why.
+- The Reports history row does not show the requested title/analyst: the stored
+  `options_json` (`ReportOptions.as_dict`) carries the section toggles but not the
+  cover title/analyst, and the `reports` table has no column for them (spec 06).
+  They are still sent to the backend and used in the rendered cover.
+- The Data-maintenance endpoints (`/api/maintenance/*`) and the
+  `INSUFFICIENT_STORAGE` (507) error code are additions not in the spec 06 tables;
+  they are recorded in `docs/DECISIONS.md`.
+- A single-case `scripts/backup.py` still snapshots the whole database, because the
+  audit log is one hash chain shared across cases and a partial export could not be
+  verified; only the file trees are scoped to the case.
+- `docs/perf-results.md` is refreshed (2026-10-11) but the spec 09 §8 end-to-end
+  targets (multi-worker throughput, 1M-event detection, 5M-event p95, UI paint,
+  10 GB ingest memory) are not measured by the harness.
+- The final verification (9f) could not run everything here: no
+  Playwright/Lighthouse/bundle-checks, and no clean-machine offline install. The
+  unrun checks are itemised in `docs/COMPLIANCE.md` and `docs/DECISIONS.md`.
+- The optional IOC enrichment (spec 05 §9) is not implemented: `allow_enrichment`
+  is a reserved flag surfaced only in `/api/health`, so there is no network
+  client to gate. A full ingest → detect → report run opening zero non-loopback
+  sockets is asserted by `test_ingest_pipeline.py::TestNoOutboundConnects`.
+
+## Phase 8a-8d - Frontend shell, core screens, alerts, ATT&CK, IOCs, Events, Timeline, Entities, Rules and Settings (complete)
+
+The frontend slices from spec 11 phases 8a-8d and spec 07: the app
+shell, the design-token theme, routing, a typed API client, the WebSocket client
+with reconnect/backoff, the jobs drawer, the Cases, Overview and Sources screens
+including the five-step custom mapping wizard, the Alerts screen with its
+seven-block detail drawer, the ATT&CK coverage matrix, the IOCs, Events,
+Timeline and Entities browsers, and the Rules catalogue (list, filters, YAML
+validate/test editor, import/export, health) and Settings screens (general,
+detection, allowlist, ATT&CK import, enrichment and data read-outs, audit
+viewer, About dialog). The Reports screen is deferred to phase 9, whose report
+service it needs; see the 2026-10-10 decision.
+
+| Area | State |
+|---|---|
+| Design tokens | `src/index.css` maps the spec 07 §1 palette onto Tailwind 4 `@theme` variables (`--color-bg/surface/surface-2/border/text/muted/accent/sev-*`) with dark values on `:root` and a `[data-theme='light']` override; components use the utility classes (`bg-surface`, `text-muted`, `text-sev-critical`, ...); fonts (Inter, JetBrains Mono) are bundled via `@fontsource-variable`, no CDN |
+| Theming | `theme/ThemeProvider.tsx`: a stored choice in `localStorage['triagelens.theme']` wins, else `prefers-color-scheme`; `applyTheme` writes `data-theme` on the document element; the shell has a toggle |
+| Routing | `App.tsx`: `/` Cases, `/status` Status, `/cases/:caseId` Overview, `/cases/:caseId/sources` Sources, `/cases/:caseId/alerts` Alerts, `/cases/:caseId/mitre` ATT&CK, `/cases/:caseId/events`, `/cases/:caseId/timeline`, `/cases/:caseId/iocs`, `/cases/:caseId/entities`, `/cases/:caseId/rules` Rules, `/cases/:caseId/settings` Settings, `*` NotFound, all under `AppShell` (left rail + top bar + connection banner + toasts + jobs drawer) |
+| API client | `api/` typed layer: `client.ts` (`requestJson`/`requestForm`, `ApiError`/`ContractError`, envelope parsing), `endpoints.ts` (cases, sources, ingest/resolve, jobs, detection, alerts list/detail/patch/bulk/evidence, events, timeline, entities, IOCs, MITRE case/static/navigator, profiles), `queryKeys.ts`, `queryClient.ts`, `invalidate.ts`, `hooks.ts` (TanStack Query v5). Request-body types are generated from the backend OpenAPI (`api/openapi.json` → `api/openapi.d.ts` → `api/schema.ts`, via `npm run gen:api` / `task.py openapi`); response types are hand-written because the OpenAPI document does not describe responses |
+| WebSocket client | `ws/jobsSocket.ts`: server-push subscription with exponential backoff (1 s doubling to 15 s), answers a server `ping` with `pong`, drops unknown frames; drives `app/JobsProvider.tsx` (live job stages, `needs_input`, drawer open/cancel) |
+| Cases | `features/cases/CasesPage.tsx`: list with per-case counts, create (name/timezone/description), rename, typed-name delete confirmation, open |
+| Overview | `features/overview/OverviewPage.tsx`: KPI tiles, top-5 alerts, Recharts mini-timeline, MITRE heat strip, attacker candidates, ingest health, last detection run |
+| Sources | `features/sources/SourcesPage.tsx`: multi-file/folder dropzone, per-file size/SHA-256/log type/confidence/counts, `needs_input` ranked-candidate resolve, parse-errors dialog, change type/timezone/year (save & re-parse), download, delete, profile selector + Run detection, "Auto-run after ingest" toggle (runs detection when an ingest job finishes while the screen is open) |
+| Mapping wizard | `features/sources/MappingWizard.tsx` + `mappingProfile.ts`: five steps — sample, match an existing profile by `applies_when`, map fields with path autocompletion from the sample, preview 20 normalized rows and errors via `POST /profiles/preview`, save via `PUT /profiles/{name}` and re-parse. Profile YAML is emitted by a purpose-built serializer; its output was verified to load through `app.ingest.profiles.load_profile` |
+| Alerts | `features/alerts/AlertsPage.tsx` + `alertFilters.ts`: URL-backed filters (level, status, host, user, min score, unmapped, `q`, tactic, technique), server-side sort on the five sortable columns, a virtualized table (`@tanstack/react-virtual`) with per-page select-all and multi-select bulk verdict, row keyboard shortcuts (j/k/Enter/x/t/f/b), pagination, and empty/loading/error states |
+| Alert drawer | `features/alerts/AlertDrawer.tsx`: the seven spec 07 §3.4 blocks — header with a score-breakdown popover, ATT&CK (external links + inferred badge + unresolved tags + offline note), rule (YAML via the read-only `ui/CodeBlock.tsx` CodeMirror), evidence (stored sample + "Load all matches"), indicators (grouped, defang toggle, copy), entities, and an analyst panel (verdict select + debounced notes autosave) |
+| ATT&CK | `features/mitre/MitrePage.tsx` + `mitreMatrix.ts`: tactic columns with count-scaled colour and severity borders, expandable sub-techniques, "Fired only" (case matrix) vs "Full matrix" (static reference with case counts overlaid), technique cells deep-link to the filtered alerts list, and Navigator-JSON and PNG-snapshot exports |
+| IOCs | `features/iocs/IocsPage.tsx` + `iocFilters.ts`: spec 07 §3.6 tabs (All, IPs, Domains, URLs, Hashes, Emails, Files & Paths, Registry, CVEs, Other), state/sort selects, min-confidence slider, show-internal/show-allowlisted/defang toggles, confidence bar, per-page select-all and bulk export (CSV/TXT/STIX/JSON) through `exportIocs`, pagination, and URL-backed filters. Single-type tabs paginate server-side; multi-type tabs fetch at the group limit and narrow in the browser |
+| IOC drawer | `features/iocs/IocDrawer.tsx`: occurrence list with event snippets, matching field and decoded-from badge, verdict select (malicious/suspicious/benign/none), allowlist toggle, tag add/remove, copy (raw and defanged), and a pivot link to the Events list filtered by the indicator |
+| Events | `features/events/EventsPage.tsx` + `eventFilters.ts` + `eventColumns.ts`: FTS5 search box with an inline syntax popover, filter chips (host/log type/channel/event ID/user/src/dst/IOC/alert), a facet sidebar (top values with counts, click to filter), a virtualized table with a sticky header, persisted column picker and compact/comfortable density, newest/oldest sort, and CSV/JSONL export of the loaded rows |
+| Event drawer | `features/events/EventDrawer.tsx` + `highlight.ts`: normalized-field table, related alerts, indicator chips with a defang toggle, a recursive tree of the decoded provider record with per-value copy, the raw record via the read-only `ui/CodeBlock.tsx` with a wrap toggle or a highlighted view (indicator matches drawn as text nodes, never `innerHTML`), and a "surrounding events" (±30 s, same host) list |
+| Timeline | `features/timeline/TimelinePage.tsx` + `timelineBuckets.ts`: a Recharts stacked bar of events per bucket coloured by log type plus an alert-count line, a brush that sets the selected range, zoom in/out, a bucket selector (auto/1m/5m/1h/1d), and lists of alerts and notable indicators within the range |
+| Entities | `features/entities/EntitiesPage.tsx`: host and user tables with event/alert counts, each name deep-linking to the Events list filtered by that host or user |
+| Rules | `features/rules/RulesPage.tsx` + `ruleFilters.ts` + `ruleFormat.ts`: URL-backed filters (kind, level, status, enabled, tag, technique, health, `q`), a Catalogue/Health tab whose count cards drill into the list by bucket, a table (enabled toggle, title, level, kind, logsource, techniques, health badge), drag-and-drop or button import (`.yml`/`.yaml`/`.zip`) with a result panel, custom-rule zip export, and pagination |
+| Rule drawer | `features/rules/RuleDrawer.tsx` + `ui/CodeEditor.tsx`: metadata table, an editable CodeMirror YAML editor, **Validate** (problems list), **Test on case** (match count + 20 samples), **Save/Create** (custom only), **Duplicate to custom** (rewrites the `id`), **Delete**, and an enable toggle for every kind |
+| Settings | `features/settings/SettingsPage.tsx`: General (theme via `ThemeProvider`, density), Detection (profile via `PUT /settings`, read-only limits), Allowlist editor (`GET/POST/DELETE /settings/allowlist`), ATT&CK import (`POST /settings/attack/import`), Enrichment and Data read-outs (config + health figures), and a case-scoped audit-log viewer with the chain-verification result |
+| About | `features/settings/AboutDialog.tsx`: live runtime diagnostics from `GET /api/health` (versions, capabilities, database and disk figures) plus a collapsible panel that reproduces `THIRD_PARTY_NOTICES.md` (bundled via `?raw`, no runtime fetch) |
+
+### Verification
+
+- `npx tsc --build --force` clean; `npx eslint . --max-warnings 0` clean.
+- `npx vitest --run`: 222 tests across 28 files (added `rulesFilters`,
+  `ruleFormat`, `RulesPage` and `SettingsPage` to the 8a-8c suites).
+- The wizard's generated YAML round-trips through the backend profile loader
+  (checked directly against `app.ingest.profiles.load_profile`).
+- `task.py openapi-check` regenerates `frontend/src/api/{openapi.json,openapi.d.ts}`
+  and fails on drift; `scripts-lint` covers `scripts/export_openapi.py`.
+
+### Known limitations
+
+- Only request bodies are generated from the OpenAPI document; response types
+  remain hand-written because every backend response is an untyped `dict`. See the
+  2026-10-10 decision.
+- The global scope bar and global search (spec 07 §4) and the command palette are
+  deferred; the left rail lists only the routes that exist.
+- The alerts list omits a rule-source (builtin/sigma/custom) filter: the backend
+  exposes no server-side filter for it, and filtering a single page client-side
+  would be misleading. See the 2026-10-10 decision.
+- The alert status change has no undo toast (spec 07 §4): `ToastProvider` has no
+  action-button support yet. The drawer is Esc-closable and autofocuses, but has no
+  full focus trap. `CodeMirror` (the rule-YAML viewer) is exercised only when the
+  YAML is toggled on.
+- The ATT&CK matrix tooltips show the technique id, name and count; the API's
+  matrix payload carries no technique description, so the spec 07 §3.5 tooltip
+  description is not shown.
+- The IOCs `type` filter is single-valued server-side, so multi-type tabs (IPs,
+  Hashes, Files & Paths, Other) fetch at most 1000 indicators and narrow, sort and
+  slice them in the browser; beyond 1000 indicators a grouped tab undercounts, and
+  its export omits the `type` filter. See the 2026-10-10 decision.
+- The IOC payload carries no per-indicator host count, linked-alert count or
+  ATT&CK techniques, so the spec 07 §3.6 table omits those columns.
+- The Events CSV/JSONL export streams the current filter result from
+  `GET /cases/{id}/events/export` (phase 9 slice 9c) up to 1M rows; the alert CSV
+  export (`GET /cases/{id}/reports/alerts.csv`) is still only reachable by API.
+- The Alerts and IOCs list endpoints accept no `from_ms`/`to_ms`, so the Timeline
+  screens' alert and indicator lists are filtered in the browser by `last_seen_ms`
+  and can only size/colour alert markers by `alert_count`, not severity.
+- The Entities API returns only `{kind, name, event_count, alert_count}` (and
+  always reports zero alerts), so the spec 07 §3.9 first/last-seen and top-technique
+  columns are not shown.
+- The Reports screen (phase 9 slice 9c) wires `POST/GET /cases/{id}/reports` and
+  `GET /reports/{id}/download`; the alert-overview CSV endpoint has no UI yet.
+- The About dialog shows the bundled `THIRD_PARTY_NOTICES.md` verbatim in a
+  collapsible `<pre>`; the text is not rendered as formatted Markdown.
+- The Rules screen has no inline CodeMirror linting: the schema-aware checks run
+  through `POST /rules/validate` and the problems are listed below the editor
+  rather than as editor markers (`@codemirror/lint` is not a declared dependency).
+  The `POST /rules/import` result reports file names and problems, not a per-rule
+  row, so the import result panel is file-scoped. Rule health covers
+  `ok`/`compile_error`/`unroutable` only; never-present fields and timeouts live on
+  detection runs, not the catalogue.
+- Settings exposes only `detection.profile` for editing (the sole key in the
+  backend's editable schema); there is no global timezone or enrichment key, so
+  those spec 07 §3.13 controls are shown read-only or omitted. The Data pane's
+  Vacuum, Rebuild-search-index, Verify-evidence-hashes and Verify-audit-chain
+  actions were added in phase 9 slice 9d. The audit viewer is case-scoped
+  (`GET /cases/{id}/audit-log`), so it asks for a case.
+- No Playwright E2E suite, screenshots or accessibility budget check yet; those
+  arrive with the remaining sub-phases.
+
+## Phase 6 — Detection engine (implemented)
+
+The spec 11 phase 6 build: the rule loader and compile health (spec 04 §1), the
+pySigma SQLite backend and routed execution with windows, correlations (spec 04
+§3–§4), detection runs with profile selection and verdict rows (spec 04 §2,
+§5–§9), the rules/alerts/ATT&CK APIs (spec 06 §3), the case event browse
+endpoints (spec 06 Events: list with FTS5 + keyset, count, facets, detail with
+linked alerts and IOCs), and a vendored, reproducible
+SigmaHQ rule sample with DRL 1.1 provenance (slice 4), and the first-run
+catalogue sync that seeds a fresh database with the shipped tree (slice 5).
+
+| Area | State |
+|---|---|
+| Rule loader | `detect/rules.py: load_rules` reads three dirs in one pass — `rules/builtin/` (16 shipped docs, 7 categories), `rules/sigma/` (vendored, see below) and the user custom dir `data/rules/custom/`; each rule keeps `kind` (`builtin`/`sigma`/`custom`), `rule_type`, level/status, `sha256`, `file_path` with `#N` per-document, tags and logsource; multi-document files are split; load problems (unparsable files) are reported, never dropped silently; `load_rules_from(settings)` and `load_rules_from_text` for the API paths |
+| Compile health | per rule: `compile_error` (pySigma compile exceptions) and `unroutable` (no logsource-map match); `rules/health` buckets `ok`/`compile_error`/`unroutable` per kind; rules are stored and served regardless of health, so a broken rule is visible |
+| Logsource map | `rules/logsource_map.yaml` routes Sigma categories → normalized columns (e.g. `process_creation` events have `process.executable` → `EventData.Image`, `command_line` → `EventData.CommandLine`); multi-field values go to `fields_json` via `json_extract`, and `cidr_rules` compile to the `cidr_match` SQLite UDF |
+| Backend | `detect/backend.py: TriageBackend` (pySigma `sqliteBackend` subclass) emits deterministic SQL with bounded result reads and parameterized field/table names; rules loose on fields absent from the schema still compile |
+| Detection run | `POST /cases/{id}/detect` (profile or explicit `rule_ids`) enqueues a `detect` job (202); the worker selects enabled rules by profile, scans a rolling detection window of the case's events, executes on the read replica, and writes per-rule verdict rows (`matched`/`no_match`/`error`) plus a run summary; one run may emit one alert per rule per host |
+| Correlations | `SigmaCorrelationRule` `all_of` windows are supported: grouping events by correlation field and enforcing the timespan on the group's aged window; correlation rules ship in `rules/builtin/` (e.g. SSH brute-force) and load on the sigma path |
+| Profiles | spec 04 §2: `fast` (builtins + stable/test at high/critical), `standard` (builtins, customs, sigma ≥ medium), `full` (everything enabled); selection is a pure function over rule metadata so `/preview`-style checks avoid the DB |
+| Rules API | spec 06 §3: `GET /rules` (filters: kind, level, status, enabled, tag, technique, health, `q`), `/rules/health`, `/rules/export`, `GET /rules/{id}`, `POST /rules` (validate + upsert one), `PUT`/`PATCH`/`DELETE`, `POST /rules/validate`, `POST /rules/test` (against a pasted dispatch), `POST /rules/import` (reconciles the full catalogue: upserts every loaded rule of all three kinds, prunes stale shipped rows, reports `imported`/`synced`/`stale_removed`) |
+| Catalogue sync | `detect/sync.py: sync_catalogue` loads all three sources, upserts everything (preserving `enabled`) and prunes shipped rows by id — never custom — with one `rules_imported` audit entry; runs at startup on `detection.sync_rules_on_startup` but only while the shipped rows count is zero (later boots skip the 4-5 s tree load), and powers the import refresh above |
+| Alerts API | `GET /cases/{id}/alerts`, `GET/PATCH /alerts/{id}` (verdict life cycle, analyst state), `POST /alerts/bulk`, `GET /alerts/{id}/events`; each alert links its source run, rule, host and the triggering events; `tactics_json` stores ATT&CK tactic/technique tags |
+| Alert IOC linking | spec 01 §8, spec 05 §3: after alerts are recorded the detect worker extracts tier-2 indicators from the evidence events (filepath/filename/registry from the structured fields; command from `process_cmdline` when the alert level ≥ medium; user agent when it matches a scanner keyword or repeats across the case) and rebuilds `ioc_alerts` so every evidence IOC — tier-1 already stored and tier-2 just stored — is linked to its alert; the re-run is idempotent (an already-seen occurrence never inflates its count), and the alert-detail `iocs` and the +5 `ioc_evidence` scoring modifier read those links |
+| Events API | `GET /cases/{id}/events` (FTS5 `q` on message/process_cmdline/parent_process_cmdline/url/user_agent/file_path/raw, `from_ms`/`to_ms`, `host`, `source_id`, `log_type`, `channel`, `event_id`, `ls_category`, `user_name`, `src_ip`, `dst_ip`, `ioc_id`, `alert_id`, `level`; `sort` restricted to `ts`/`-ts`; opaque cursor on `(ts_ms, id)`, no OFFSET), `/cases/{id}/events/count` (same filters, fast count), `/cases/{id}/events/facets` (top-N values for host/log_type/channel/event_id/user_name/src_ip), `/cases/{id}/timeline` (`bucket=auto\|1m\|5m\|1h\|1d`, same filters; only non-empty epoch-aligned buckets; `alert_count` = distinct alert-linked events), `/events/{id}` (detail incl. `fields`, `raw`, linked alerts as `Alert` and IOCs); `total` is `null` on the list and `include=raw` opts the raw line in; invalid FTS syntax → 422 |
+| Audit log | `GET /cases/{id}/audit-log` serves the append-only chain (spec 10 §2) newest-first: entries `{id, ts, case_id, action, detail, prev_hash, hash}` with pagination (`limit`/`offset`/`order`) and a per-request hash-chain verification `{chain_ok, rows_checked, head_hash, broken_at?, broken_reason?}` that always walks the whole chain so interleaved rows of other cases cannot hide a real edge |
+| Settings API | spec 06 "Health and settings": `GET /settings` returns `{settings, overrides, allowlist}` — the effective config with the auth token masked (spec 10 §1), the stored analyst overrides overlaid on it, and the global allowlist; `PUT /settings` validates a partial update of the editable keys (`detection.profile`) and appends a `settings_changed` audit row; `GET/POST/DELETE /settings/allowlist[/{id}]` manage global entries (idempotent per `(kind, value)`, `allowlist_changed` audit, unknown id → 404); `POST /cases/{id}/detect` defaults to the stored profile override, else config |
+| ATT&CK | `GET /mitre/matrix`, `/cases/{id}/mitre`, `/cases/{id}/mitre/navigator-layer` (MITRE Navigator layer v4), `GET/import /mitre/techniques…`; the import endpoint seeds tactics/techniques from a local `enterprise-attack.json` bundle via the same importer as `scripts/update_attack.py` |
+| Vendored SigmaHQ rules | `scripts/update_rules.py` vendors a pinned SigmaHQ/sigma snapshot into `rules/sigma/` — 374 rules measured by compile+routing health (Windows 147 across 15 families with per-level caps, Linux 186, Web 40, network/firewall 1); the tree is deterministic (double-load identical, digests asserted) and ships `SOURCE.txt`, `upstream-LICENSE.md` and the DRL 1.1 `LICENSE`; see `docs/DECISIONS.md` (2026-10-09) and `SOURCES.md` |
+| Provenance | root `SOURCES.md` records the SigmaHQ commit `48f2d096`, tree/source SHA-256, the ATT&CK import workflow, and the IANA TLD source; `THIRD_PARTY_NOTICES.md` reproduces the DRL 1.1 and MITRE ATT&CK terms of use |
+| Fixtures & scenarios | e2e detection tests drive the raw fixtures from earlier phases (Scenario A web shells, B brute-force, C scanning) through source → parse → detect and assert the expected alerts and their ATT&CK tags |
+
+### Verification
+
+| Gate | Command | Result |
+|---|---|---|
+| Backend lint | `.venv\Scripts\python.exe scripts\task.py backend-lint` | clean (ruff check + format check) |
+| Backend tests | `.venv\Scripts\python.exe scripts\task.py backend-test` | 1769 passed, 1 skipped (perf benchmarks run separately); see the slice gate below |
+| Backend types | `.venv\Scripts\python.exe scripts\task.py backend-typecheck` | clean (mypy, 192 source files); the earlier Application Control block lifted since Phase 5 |
+| Lockfile | `.venv\Scripts\python.exe scripts\task.py lock-check` | current: pySigma 1.5.1 + `pysigma-backend-sqlite` 2.0.0 pinned via `requirements.lock` |
+
+Slice gate (3a–3f + 4 + 5 + 6 + 7):
+
+| Gate | Command | Result |
+|---|---|---|
+| Backend lint | `scripts\task.py backend-lint` | clean |
+| Backend types | `scripts\task.py backend-typecheck` | clean (mypy, 192 source files) |
+| Backend tests | `scripts\task.py backend-test` | 1769 passed, 1 skipped |
+| Scripts lint | `scripts\task.py scripts-lint` | clean |
+
+### Known limitations
+
+- **Network and niche coverage is bounded by the logsource map.** 44 of 45
+  `rules/network` files (cisco/zeek/dns) and most non-Windows service channels
+  are unroutable with the shipped map and so excluded from the vendored sample;
+  adding products there is a `logsource_map.yaml` change, not a rule change.
+- The vendored sample pins SigmaHQ at `48f2d096` (2024-05-31); newer rules are
+  picked up by re-running `scripts/update_rules.py` against a fresh clone.
+
 ## Phase 5 — IOC engine (implemented)
 
 The spec 11 phase 5 build: the `app/ioc` engine (refang, decode passes, patterns
@@ -44,8 +281,10 @@ IOC/entity/export API of spec 06.
   §8 pipeline target; that target measures parse + normalize + IOC tier 1 +
   persist end to end, which the ingest pipeline measures as a whole in a later
   phase.
-- The enrichment path (`network.allow_enrichment`, VirusTotal/AbuseIPDB) is not
-  implemented yet; the spec's outbound-network test (S-05) stays open.
+- The enrichment path (`network.allow_enrichment`, VirusTotal/AbuseIPDB) is
+  optional (spec 05 §9) and not implemented; the S-05 no-outbound-sockets half is
+  now covered by `test_ingest_pipeline.py::TestNoOutboundConnects`, and the
+  enrichment-endpoint 403 half is N/A while no endpoint exists.
 - The ambiguous-TLD penalty is scoped to the free-text acceptance path; see
   `docs/DECISIONS.md`, 2026-10-08.
 

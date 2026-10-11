@@ -9,11 +9,17 @@ and the built single-page frontend. Data lives in a local SQLite database.
 
 ## Status
 
-Phase 0 (foundation) is implemented: configuration, the SQLite schema and
-migration runner, the health endpoint, the HTTP hardening layer, the audit hash
-chain, and a status frontend. Ingestion, detection and reporting arrive in later
-phases. See [docs/STATUS.md](docs/STATUS.md) for what works today and
-[docs/spec](docs/spec) for the specifications being built against.
+All build phases (0 through 9) are implemented. That covers the ingestion
+pipeline and its parsers (Windows EVTX and event XML, Linux syslog/journald/auditd,
+web access and error logs, firewall logs, generic profiles and archives), the
+detection engine (builtin rules plus Sigma rules compiled to SQLite predicates),
+alerts with MITRE ATT&CK context, IOC extraction, the events, timeline and
+entities browsers, reports and streamed exports, and the operational scripts.
+
+See [docs/STATUS.md](docs/STATUS.md) for what works today and the known
+limitations, and [docs/DECISIONS.md](docs/DECISIONS.md) for the deliberate
+deviations from the specs. The specifications being built against live in
+[docs/spec](docs/spec).
 
 ## Requirements
 
@@ -69,6 +75,46 @@ and so on.
 which is unreliable on a shared machine and would make the gate flaky. Run
 `make perf` when you want them.
 
+## Usage
+
+TriageLens is a single-user, local triage workbench. A typical session runs
+entirely in the browser against `http://127.0.0.1:8787`:
+
+1. **Create a case.** A case owns its sources, events, alerts, indicators and
+   reports. Cases are the unit the rail navigates.
+2. **Import evidence** from the Sources screen: a single log file, a directory,
+   or an archive. Uploads stream to disk, archived inputs are expanded under the
+   archive limits, and each source is parsed into normalised events on a worker
+   process.
+3. **Detect.** Run a detection profile (`fast`, `standard` or `full`) over a
+   source. Builtin and imported Sigma rules are compiled to SQLite predicates and
+   executed against the event store; matches become alerts grouped into
+   incidents.
+4. **Review alerts** on the Alerts screen: severity, the triggering events,
+   extracted indicators, and the mapped ATT&CK techniques, with coverage shown in
+   the ATT&CK matrix.
+5. **Pivot** through the Events, Timeline and Entities screens and the IOCs
+   register, using full-text search and column filters.
+6. **Report and export.** Generate a self-contained HTML, Markdown or JSON report
+   (PDF when WeasyPrint is installed) and stream the current event filter as CSV
+   or JSONL.
+
+Every mutating step appends to the audit log, an append-only SHA-256 hash chain
+that is verified when read.
+
+### Backup, diagnostics and maintenance
+
+- **Backup.** `python scripts/backup.py <case_id|all> <dest-dir>` writes a zip
+  with a consistent `VACUUM INTO` database snapshot, the case file trees and a
+  `manifest.json` of per-file SHA-256 digests. A single-case export still carries
+  the whole database, because the audit log is one chain shared across cases.
+- **Diagnostics.** `python scripts/diag.py` prints version and build info, the
+  effective configuration with secret-looking values masked, and the log tail;
+  add `--health` to probe a running server. It never reads event content.
+- **Maintenance.** The Settings → Data pane (backed by `/api/maintenance/*`) can
+  VACUUM the database, rebuild the full-text index, re-hash every stored original
+  and re-verify the audit chain.
+
 ## Dependencies
 
 Runtime versions live in `backend/pyproject.toml`. The container installs from
@@ -95,20 +141,29 @@ backend/
     config.py          validated settings, precedence, safe-bind rules
     main.py            application factory, lifespan, middleware stack
     api/middleware.py  security headers, Host validation, bearer auth, access log
-    api/routers/       HTTP endpoints (health so far)
+    api/routers/       HTTP endpoints (cases, sources, events, alerts, iocs,
+                       mitre, rules, settings, reports, jobs, maintenance, ws)
+    ingest/            archive handling, format detection and intake
+    parsers/           one parser per log format, normalising to events
+    detect/            rule engine, Sigma compilation and detection profiles
+    ioc/               indicator extraction, validation, scoring and STIX export
+    reports/           neutral report model, renderers and streamed exports
+    jobs/              worker processes and the single writer thread
+    mitre/             ATT&CK bundle import, tagging and matrix aggregation
     db/connection.py   SQLite pragmas, capability probes, transactions
     db/migrations.py   ordered, transactional migration runner
     db/repositories/   typed data access; the audit chain lives here
     models/            dataclasses mirroring database rows
     util/              hashing, ids, time, redacting structured logging
   migrations/          numbered SQL files
-  tests/               pytest suite
+  rules/               builtin and vendored Sigma rules
+  tests/               pytest suite (unit, API, end-to-end, perf)
   data/                runtime data directory (cases, sources, logs, database)
 frontend/
   src/api/             typed client for the backend
   src/features/        one directory per screen
   src/lib/             pure helpers
-scripts/               task runner and run scripts
+scripts/               task runner, run scripts and operational tools
 docker/                Dockerfile and compose file
 docs/spec/             specifications 00-11
 ```
@@ -147,6 +202,13 @@ contain a token.
   SQLite triggers reject `UPDATE` and `DELETE`. Verification walks the chain and
   reports the first inconsistency.
 - **Secrets are redacted** from logs by value and by key name.
+- **Offline by construction.** No component performs an outbound request; the
+  optional enrichment path is disabled unless `network.allow_enrichment` is set.
+- **Bounded input.** Uploads, archives (expansion ratio, total size, depth and
+  member count) and per-source event counts are capped, and ingest refuses to
+  start when the disk is too full rather than filling it.
+- **Secure delete.** With `storage.secure_delete = true`, deleted originals are
+  overwritten in place before unlinking.
 
 ## Testing
 
@@ -194,9 +256,12 @@ Two details are deliberate and worth knowing before running the image directly:
 
   Requests then need `Authorization: Bearer <that token>`.
 
-The `pdf` profile only adds the WeasyPrint system libraries. WeasyPrint itself is
-not a Phase 0 dependency, so that variant still reports `pdf_available: false`
-until reporting lands in a later phase.
+The `pdf` profile builds a second image (served on host port 8788) with the
+WeasyPrint system libraries installed. WeasyPrint itself is an optional import
+that is not in the base dependency set or the lockfile, so it is absent from both
+images and `/api/health` reports `pdf_available: false`; the PDF report option is
+disabled and the endpoint answers `422 PDF_UNAVAILABLE`. Install WeasyPrint into
+the environment yourself to enable PDF rendering.
 
 ## Offline install
 
@@ -234,8 +299,10 @@ Details worth knowing:
 - **The application is not pip-installed.** `app/` resolves `migrations/`, `rules/`
   and `data/` relative to its own location, so it runs from the tree — the same
   layout the container uses.
-- **ATT&CK data is not included yet.** It arrives with the detection phases; the
-  bundle currently carries the seed data that exists.
+- **The ATT&CK bundle is not included.** Import your own STIX export with
+  `scripts/update_attack.py <enterprise-attack.json>` after install (see
+  `SOURCES.md`); the coverage matrix and technique metadata populate from it. The
+  detection engine still runs without it, using the fallback ATT&CK map.
 
 ## License
 

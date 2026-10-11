@@ -127,6 +127,7 @@ worker_processes = 0       # 0 = cpu_count - 1
 [detection]
 profile = "standard"       # fast | standard | full
 auto_run_after_ingest = true
+sync_rules_on_startup = true   # seed the shipped rule tree on first run only
 max_sample_events_per_alert = 500
 rule_timeout_seconds = 120
 alert_group_window_minutes = 60

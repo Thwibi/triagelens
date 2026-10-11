@@ -3,6 +3,496 @@
 Each entry records a decision that is not obvious from the code, why it was
 made, and what it costs. Newest first. Dates are ISO-8601.
 
+## 2026-10-11 — Closing the 9f gaps: coverage, socket guard, licences, CI
+
+**Decision.** The five concrete gaps the 9f entry named were closed, and three
+non-obvious choices were made:
+
+1. **`parsers` coverage.** Spec 00's 85% target is measured after omitting
+   `app/ingest/parsers/evtxlib/`, the vendored third-party reader — the same
+   package already excluded from `ruff` and `mypy` because it is not this
+   project's code. The project-authored parser files sit at 88%, and
+   `windows_evtx.py` rose from 58% to 99% by testing the native `pyevtx-rs` walker
+   with a stub reader (the extension is an optional dependency, absent here). The
+   four spec 00 packages (`parsers` 88%, `detect` 92%, `ioc` 93%, `mitre` 94%) are
+   now all ≥ 85%; overall 89.56%.
+2. **S-05 guard allows loopback.** The negative control that blocks non-loopback
+   connects would also break the ingest IPC, because on Windows
+   `multiprocessing.Manager` reaches its queue over loopback TCP. The guard
+   therefore permits `127.0.0.1`/`::1`/`localhost` and fails on everything else,
+   which still proves the offline guarantee while keeping the real workers under
+   test.
+3. **Licences are bundled, not fetched.** `AboutDialog.tsx` imports
+   `THIRD_PARTY_NOTICES.md?raw` so the exact notice text ships in the bundle with
+   no runtime request; `vite.config.ts` widens `server.fs.allow` to `['..']` so
+   the dev/test file server can reach a file above the frontend root. A CI workflow
+   (`.github/workflows/ci.yml`) was added for lint, typecheck, coverage, and
+   `npm audit`/`pip-audit`.
+
+**Why.** These were the acceptance-relevant gaps in the 9f matrix; leaving them
+open would contradict spec 00's "85% on those four packages" and spec 09 S-05.
+
+**Cost.** The `evtxlib` omission is a coverage-policy choice, not free coverage:
+the vendored reader is exercised by the real EVTX fixtures but is not itself
+measured. The socket test only guards the API/worker process it runs in (the
+parse pool is a separate process, but it makes no connects). The CI workflow has
+not yet run on a runner, and browser E2E / Lighthouse / offline clean-machine
+install remain unrun (see `docs/COMPLIANCE.md`).
+
+## 2026-10-11 — Final verification (9f): what was run, what was not
+
+**Decision.** The phase 9 final verification (`docs/COMPLIANCE.md`) records the
+result of each gate that could run here and names every requirement that could
+not be verified, rather than asserting a pass that was not executed. Ran: the
+full backend gate (ruff + mypy clean; 1798 passed, 1 skipped), the full frontend
+gate (tsc + ESLint clean; 232 passed), `make perf` (15 primitive benchmarks,
+refreshed in `docs/perf-results.md`), `npm audit --audit-level=high` (0
+vulnerabilities), and the 9d `backup.py`/`diag.py` smoke runs. The spec 00
+acceptance items (every MUST tested, 85% coverage on `parsers`/`detect`/`ioc`/
+`mitre`, and the three E2E scenarios passing byte-for-byte) are mapped to code
+and tests in the matrix.
+
+**Why.** The specs are normative and spec 00 requires that every MUST be
+implemented *and covered by a test*; the honest form of that claim is a matrix
+with the gaps visible, not a green checkmark that hides them. Several checks are
+environment-bound: `pip-audit` was not installed and no CI workflow existed at the
+time (both since added), the Playwright E2E / Lighthouse / bundle-budget harness
+is not installed, the offline
+bundle has not been installed on a separate network-disabled machine, and the
+perf harness measures storage/parse/IOC/health primitives rather than the spec 09
+§8 end-to-end targets.
+
+**Cost (open risks — spec 00 says these should be none).** Five concrete gaps
+were named here: (1) `app/ingest/parsers` coverage was 74%, under the spec 00
+per-package 85% target; (2) no adversarial SQL-injection test (S-04); (3) no
+`socket.connect` guard test for a full run (S-05); (4) `app/detect/rules.py` used
+`yaml.safe_load` with neither a 1 MB document cap nor an alias-count limit
+(S-07); (5) the About dialog referenced but did not render
+`THIRD_PARTY_NOTICES.md`. All five were closed the same day — see "Closing the
+9f gaps" above. The environment-bound items remain: no browser E2E/a11y/bundle
+checks, no clean-machine offline install, and no spec 09 §8 end-to-end
+timing/memory verdict. Each is listed under "Gaps and open risks" in
+`docs/COMPLIANCE.md`.
+
+## 2026-10-11 — Deleting a case or source is audited, tombstones the chain, and removes files
+
+**Decision.** `DELETE /cases/{id}` returns `204` and, inside one writer
+transaction, appends a `case_deleted` audit row, records an `audit_tombstones`
+row (last hash + row count) and deletes the case (cascading to sources, events,
+alerts and IOCs). Only after the commit does it remove
+`data/cases/<id>/` and `data/reports/<id>/`, honouring `storage.secure_delete`
+(zero-in-place before unlink). `DELETE /sources/{id}` likewise appends
+`source_deleted`. File deletion is best-effort and never rolls back the DB.
+
+**Why.** Spec 02 §4 and spec 06 require the audit entry, the cascade and the
+`204`; spec 10 §2 requires a case's final chain head to be anchored so the chain
+stays verifiable after its rows are gone. The pre-existing endpoints wrote no
+audit row and left the case directory behind, and `write_tombstone` was defined
+and tested but never called in production. Ordering the filesystem work after the
+commit keeps the invariant "a row never names a file that is already gone".
+
+**Cost.** The `case_created`/`case_updated` actions remain in
+`KNOWN_ACTIONS` but are still not appended (only create/update; out of scope
+here). File removal failures (a file held open) leave orphaned bytes on disk but
+do not fail the request; `scripts/backup.py` and `verify-hashes` are the tools to
+detect that.
+
+## 2026-10-11 — Disk exhaustion is refused up front; maintenance is an out-of-band API
+
+**Decision.** Ingest calls `ensure_disk_space` before storing: it refuses when
+free space is under 3× the incoming bytes or below
+`limits.min_free_disk_fraction` (default 5%), raising a new
+`INSUFFICIENT_STORAGE` (507) code. The Settings Data pane's four operations live
+under `/api/maintenance/*` (vacuum, rebuild-fts, verify-hashes, verify-audit),
+which are not in the spec 06 table. `VACUUM` runs on the writer thread **without**
+a surrounding transaction (`writer.run(work, transactional=False)`).
+
+**Why.** Spec 10 §1 states the two disk rules but spec 06 defines no error code,
+so one had to be added; 507 "Insufficient Storage" is the natural status.
+`VACUUM` cannot execute inside a transaction (SQLite errors), so the writer
+needed an explicitly non-transactional path rather than a second connection,
+which would break the one-writer rule. The maintenance endpoints are grouped
+apart from the request path because a large database makes them slow; they use a
+5-minute timeout instead of the normal writer hand-off.
+
+**Cost.** The frontend `ApiErrorCode` union does not yet list
+`INSUFFICIENT_STORAGE` (nor several other real codes), so such an error collapses
+to `INTERNAL` in the UI while the message is preserved; widening the union is
+deferred. `ensure_disk_space` is a single check at ingest start, not a running
+reservation, so concurrent ingests can still race past it.
+
+## 2026-10-11 — Reports are one writer-bound job over one neutral model
+
+**Decision.** `POST /cases/{id}/reports` enqueues a `report` job; the
+`ReportRunner` gathers, renders and records the file on the single writer thread
+inside one transaction, exactly like the detect runner. Every format (HTML, PDF,
+Markdown, JSON, and the alert CSV) renders from the same `ReportData` tree in
+`app/reports/model.py`. The HTML template turns Jinja2 **autoescape on
+explicitly** rather than via `select_autoescape`, and the record's `path`/`sha256`
+are re-checked on download.
+
+**Why.** Generation must be atomic with its evidence: a `reports` row that names a
+file which was never written, or a file with no row, would be a lie an analyst
+could act on. Routing the whole thing through the writer gives that for free and
+keeps the one-writer rule. One model keeps spec 08's cross-format guarantee "the
+same data in every format" true by construction instead of by four parallel
+mappers. Autoescape is explicit because `select_autoescape(["html", "xml"])`
+matches on the template *name*, and the template is `report.html.j2` — it ended in
+`j2`, so autoescape was silently off and a log-derived host/source value rendered
+as live markup; the test seeds a `<script>` host to pin the fix.
+
+**Cost.** A report job occupies the writer for the length of a gather + render,
+so a very large case can delay other writes; the work is bounded by the alert
+page size, the per-alert event cap (≤50) and the CSV page size. PDF stays
+optional (missing WeasyPrint → `422 PDF_UNAVAILABLE`). The Navigator layer's
+description embeds the report's `generated_at`, so it is deterministic only when
+that timestamp is fixed — which is exactly the allowance spec 08 makes ("differs
+only in the generation timestamp and report id").
+
+## 2026-10-10 — Rules and Settings sit under the per-case rail; health stays catalogue-scoped
+
+**Decision.** The Rules and Settings screens are registered as per-case routes
+(`/cases/:caseId/rules`, `/cases/:caseId/settings`), matching the spec 07 §1 left
+rail, even though the rules and settings endpoints are global. The Rules health
+view shows only the catalogue's `ok`/`compile_error`/`unroutable` buckets.
+
+**Why.** Spec 07 §1 lists Rules, Reports and Settings inside the per-case
+navigation, and two of them genuinely need case context: Settings' audit viewer
+(chain-scoped) and Rules' "Test on case". Routing them under the case keeps the
+current case selected while the underlying calls stay global. For health, the
+spec text also names "never-present fields" and "timeouts (from last run)", but
+those are recorded per detection run (`GET /detection-runs/{id}/rules`), not in
+`GET /rules/health`; the page states this rather than fabricating the columns.
+
+**Cost.** The Rules list is not case-filtered (rules are global), so the same
+catalogue shows under every case — correct, but a reader may expect otherwise.
+Never-present-field and timeout diagnostics require a detection-run drill-down
+that this slice does not add.
+
+## 2026-10-10 — The Reports screen and licence bundle wait for the Phase 9 service
+
+**Decision.** Phase 8d builds the Rules, Settings and About screens but not the
+Reports screen, and the About screen shows live runtime diagnostics rather than a
+third-party licence bundle.
+
+**Why.** Spec 11 lists Reports under 8d, but the report service it needs
+(`POST /cases/{id}/reports`, `GET /cases/{id}/reports`, `GET /reports/{id}/download`)
+is scoped to Phase 9 and no such route exists in the backend today — confirmed by
+grepping `backend/app/api/routers/` and the exported `frontend/src/api/openapi.json`
+(there is no `/reports` path; the router set is rules, settings, audit, mhealth,
+alerts, cases, detect, events, iocs, jobs, mitre, profiles, sources, websocket).
+Likewise `THIRD_PARTY_NOTICES.md` and `SOURCES.md`, the source of the About licences,
+are Phase 9 deliverables. Building either UI now would mean a screen wired to
+endpoints that return 404, which the "no stubs" rule forbids. The `JobKind` union
+already carries `report`, so the frontend is ready to host the screen.
+
+**Cost.** Spec 8d is delivered minus Reports and the licences list. When Phase 9
+adds the report endpoints and the notices files, add `features/reports/` (the spec 07
+§3.12 options form, sandboxed preview, history table) and point About's licences
+section at the generated notices. Until then About shows the real `/health` versions
+and capabilities.
+
+## 2026-10-10 — Multi-type IOC tabs fetch unfiltered and narrow in the browser
+
+**Decision.** The IOCs screen (spec 07 §3.6) shows grouped tabs (IPs, Hashes,
+Files & Paths, Other) alongside single-type tabs. A single-type tab sends its
+`type` to the server; a grouped tab instead requests the indicators unfiltered by
+type at a 1000-row limit and filters, sorts and slices them in the browser
+(`features/iocs/iocFilters.ts`). Its bulk export therefore omits the `type` filter.
+
+**Why.** `GET /cases/{id}/iocs` accepts a single `type` value per request, so a tab
+covering several types cannot be expressed as one server query. Issuing one request
+per type would break the single paginated list and the bulk-export contract;
+fetching the group and narrowing locally keeps one coherent view. "All" stays fully
+server-paginated.
+
+**Cost.** A grouped tab with more than 1000 indicators undercounts and its export
+covers only the fetched window. If the backend grows a repeatable `type` parameter
+(or `type_in`), switch grouped tabs to server filtering and drop `isGroupedTab` /
+`iocPage`.
+
+## 2026-10-10 — Events export serialises the loaded rows, not a server stream
+
+**Decision.** The Events screen's CSV/JSONL export (spec 07 §3.7) is built in the
+browser from the rows the page has loaded, using the visible column set.
+
+**Why.** There is no events-export endpoint; the case event list is keyset-paginated
+and capped at 1000 rows per request. A client-side export of the loaded window is
+the honest thing the API allows, and it keeps the exported columns identical to what
+the analyst sees.
+
+**Cost.** The spec's "streamed, max 1M rows" export is not met; a very large case
+exports only the loaded page. Add a streaming export endpoint and switch this screen
+to it when one exists.
+
+## 2026-10-10 — Timeline lists filter alerts and IOCs in the browser
+
+**Decision.** The Timeline screen (spec 07 §3.8) draws its stacked bars from the
+bucketed `/timeline` payload and filters the "alerts in range" and "notable
+indicators in range" lists client-side by `last_seen_ms`. Alert markers are sized
+and coloured by the bucket's `alert_count` only.
+
+**Why.** The Alerts and IOCs list endpoints accept no `from_ms`/`to_ms`, and the
+timeline buckets carry no per-bucket severity, so neither the range lists nor a
+severity-coloured marker can be produced from one server call. Filtering the
+already-fetched lists in the browser is correct for the displayed window.
+
+**Cost.** A range list can miss items outside the fetched page, and markers cannot
+encode severity. If the list endpoints gain time bounds and the buckets gain a
+severity breakdown, move both to the server and colour the markers by severity.
+
+## 2026-10-10 — The alerts list omits a rule-source filter the backend cannot serve
+
+**Decision.** The Alerts screen (spec 07 §3.4) exposes level, status, host, user,
+minimum score, `q`, tactic, technique and unmapped filters, but not a
+builtin/sigma/custom rule-source filter, even though the alert row carries
+`rule_kind`.
+
+**Why.** `GET /cases/{id}/alerts` has no server-side parameter for `rule_kind`
+(only level, status, rule_id, host, user_name, min_score, q, tactic, technique and
+unmapped). Filtering the 50 rows of the current page client-side would show a
+partial, wrong result for any case with more than a page of alerts. Omitting the
+control is honest; a filter that silently lies about the data is not.
+
+**Cost.** Operators cannot narrow the list by rule source in the UI. If the
+backend gains a `rule_kind` parameter, add it to `AlertFilters` and re-add the
+control; the URL-state module (`features/alerts/alertFilters.ts`) is where the
+key would live.
+
+## 2026-10-10 — Frontend request-body types are generated from the backend OpenAPI; response types are hand-written
+
+**Decision.** `scripts/export_openapi.py` writes the FastAPI document to
+`frontend/src/api/openapi.json` (deterministic, sorted), and `npm run gen:api`
+turns it into `frontend/src/api/openapi.d.ts`. `frontend/src/api/schema.ts`
+re-exports those generated schemas under the app's names, and the request-body
+types in `api/endpoints.ts` are aliases of them. Response shapes stay hand-written
+in `api/types.ts`, and the client parses envelopes defensively
+(`expectRecord`/`expectArray`, `ContractError`) rather than trusting a schema.
+`openapi-check` (part of `task_all`) regenerates both artifacts and fails on drift.
+
+**Why.** Spec 11 phase 8a asks for "typed schemas generated from the backend
+OpenAPI". The backend annotates only request bodies — every response is an
+untyped `dict` — so the OpenAPI document (23 component schemas, all request
+bodies) cannot type responses at all; generating them would produce empty
+`Record<string, unknown>`s. Generating what the document actually describes, and
+keeping response types honest and hand-maintained, is the truthful reading. The
+WS frames (spec 06 §4) are absent from OpenAPI and stay hand-written regardless.
+
+**Cost.** This is a partial implementation of the phase 8a wording. If the
+backend later annotates response models, `schema.ts` and `types.ts` should be
+extended to consume them; until then a response-shape change must be mirrored in
+`types.ts` by hand (the request half is now enforced by `openapi-check`).
+
+## 2026-10-10 — The frontend keeps server state in TanStack Query v5, not hand-rolled hooks
+
+**Decision.** Every screen reads server data through TanStack Query v5
+(`api/hooks.ts`, `api/queryKeys.ts`, `api/queryClient.ts`). Mutations invalidate
+the affected case-scoped keys through one `invalidateCaseData` helper, and the
+`JobsProvider` WebSocket frames call the same invalidation so a live job update
+refreshes the lists without polling. This replaces the earlier hand-rolled
+`useHealth` polling pattern.
+
+**Why.** Spec 07 §4 requires that lists update live while a job runs and that
+background changes refresh the UI; a query cache with key-based invalidation is
+the smallest correct way to express that and matches the stack spec 07 names.
+
+**Cost.** Component tests must wrap a screen in a `QueryClientProvider`; the new
+test helper sets `retry: false` so a failing fetch surfaces immediately instead
+of retrying.
+
+## 2026-10-10 — The mapping wizard serializes profile YAML itself
+
+**Decision.** The custom mapping wizard builds profile YAML with a small,
+purpose-built serializer in `features/sources/mappingProfile.ts`
+(`buildProfileYaml`) that emits only the keys `app.ingest.profiles.load_profile`
+understands, in a fixed order, quoting every scalar.
+
+**Why.** The wizard must show the operator exactly what will be saved and dry-run
+it through `POST /profiles/preview` before writing anything. Emitting the exact
+YAML the loader will parse (rather than assembling a JSON body the backend then
+re-serializes) keeps the preview, the saved file and the operator's mental model
+identical; the emitted output was checked to load through `load_profile`.
+
+**Cost.** The serializer is a second implementation of the profile schema and
+must be kept in step with `app/ingest/profiles.py`. It deliberately supports only
+the scalar/list subset the editor exposes; a hand-written profile using a feature
+the wizard cannot express is edited in the (future) YAML editor instead.
+
+## 2026-10-10 — Alert IOCs are linked in the detect transaction, and tier-2 extraction is idempotent
+
+**Decision.** After alerts are recorded and enriched, the detect worker calls
+`link_alert_iocs` (`detect/ioc_link.py`). It reads the case's `alert_events`,
+reloads each evidence event as a `NormalizedEvent`, extracts tier-2 indicators
+(filepath/filename/registry through the standard scanners; `command` from
+`process_cmdline` only when the alert level is `medium`/`high`/`critical`;
+`user_agent` only when it matches a scanner keyword or occurs at least twice
+across the case), stores them through a new `IocRepository.store_alert_iocs`
+that advances `occurrences` only for genuinely new `(event, field)` rows, then
+rebuilds the case's `ioc_alerts` (delete the case's links, re-insert the distinct
+`alert_events ⋈ ioc_occurrences` pairs) inside one `atomic()` block.
+
+**Why.** Spec 01 §8 ("enrich + score") and spec 05 §3 place tier-2 extraction
+after alerts exist, but `ioc_alerts` was previously only ever read — by the
+alert-detail `iocs` list and the +5 `ioc_evidence` scoring modifier — and nothing
+ever wrote it, so both were dead in production. Extracting inside the detect
+transaction keeps the links consistent with the alerts they describe. Detection
+runs repeat, so re-extraction must not inflate counts: the parse-stage `store`
+deliberately accumulates across streaming batches, which is wrong for evidence
+that is re-read whole, hence the separate idempotent `store_alert_iocs`.
+
+**Cost.** Tier-2 indicators exist only for events an alert points at; an
+indicator on a non-alerting event stays out. The scanner user-agent keyword list
+is a module constant that duplicates the list in `rules/builtin/web_attacks.yml`
+(spec 04 §10) and must be kept in step by hand.
+
+## 2026-10-10 — Only settings with a live effect are writable, and allowlist adds are idempotent in code
+
+**Decision.** `PUT /settings` accepts exactly one editable key, `detection.profile`
+(one of `fast`/`standard`/`full`); the value is validated against the schema and
+persisted to the `settings` table, and `POST /cases/{id}/detect` resolves its
+profile as `body.profile or detection_profile(stored_overrides, config)` so a
+stored override actually changes a run. Every other setting (`server`, `limits`,
+`detection` knobs other than the profile) stays read-only and is rejected with
+`VALIDATION_ERROR`, as are empty bodies and unknown keys. Separately,
+`AllowlistRepository.add_global_entry` is idempotent per `(kind, value)`: it
+`SELECT`s first and returns `(record, created)`, and the router only writes an
+`allowlist_changed` audit row when `created` is true.
+
+**Why.** Spec 06 lists a settings API and spec 11 says not to leave stubs; a
+setting endpoint that accepted keys nothing reads would be a stub. Restricting the
+writable set to the one knob the detect path honors keeps every accepted value
+observable. The `allowlist` table has no unique index on `(scope, kind, value)`
+(see spec 02 §data model), so idempotency cannot ride on `INSERT OR IGNORE` and
+must be enforced by the read-then-write in the repository.
+
+**Cost.** Adding a new editable setting means adding its schema entry, its
+overlay mapping and a consumer that reads it — three edits, not one. The
+allowlist read-then-write is not atomic against a concurrent duplicate insert;
+the single-writer thread is what keeps it safe.
+
+## 2026-10-09 — Event browsing uses keyset pagination and a deferred count
+
+**Decision.** `GET /cases/{id}/events` paginates with an opaque keyset cursor on
+`(ts_ms, id)` (urlsafe-base64 `"<ts_ord>:<rowid>"`), never OFFSET, and returns
+`total: null`; exact totals come from `GET /cases/{id}/events/count` with the
+same filters. `sort` is restricted to `ts`/`-ts` — the only orderings the keyset
+is sound for — and `NULL ts_ms` events are ordered as if `0` via `COALESCE`
+(with a tie-break on `id`, so a missing timestamp still pages deterministically).
+
+**Why.** Spec 06 says events are keyset-paginated on `(ts_ms, id)` and that
+`total` is omitted when a full count would be expensive; a row whose timestamp
+is unset (no case timezone at ingest time) still has to land in exactly one
+position. Restricting the sort keeps the where-clause's row comparison honest:
+an offset- or secondary-key sort cannot be represented with one cursor tuple.
+
+**Cost.** The first key of the browse sort is timestamp, so there is no way to
+walk events by `id` alone; clients that want chronological browse must send
+`sort=ts`. The cursor is not human-readable.
+
+## 2026-10-09 — Invalid FTS syntax is a 422, and list columns are qualified for the FTS join
+
+**Decision.** When `q` is present the events repository joins
+`events_fts ON events_fts.rowid = events.id` and runs `events_fts MATCH ?`
+against the query text; a malformed query surfaces as `sqlite3.OperationalError`
+and is re-raised as `ValueError`, which the router maps to a 422
+`VALIDATION_ERROR` whose message is the sqlite text with the `fts5: ` prefix
+stripped (`invalid search query: ...`). Every column selected in an events list
+query is written `events.<column>` (including `id`, which is not part of
+`EVENT_COLUMNS`), and the FTS row reference comes only through the rowid join —
+the query never selects from the FTS table's columns.
+
+**Why.** The FTS external-content table and its backing table share column names
+(`message`, `process_cmdline`, ..., `raw`), so a bare column list makes the
+combined SELECT ambiguous and a `MATCH` error was leaking as a stored-string
+rather than a clean API error. Qualifying everything and joining only on rowid
+keeps the SELECT unambiguous, and converting the syntax error at the repository
+boundary turns a driver exception into a normal 422 the UI can show.
+
+**Cost.** List queries must be qualified with the table name to stay correct —
+there is no shortcut that drops the prefix. The 422 message mirrors sqlite's
+wording, so it reads like a parser diagnostic rather than an app message.
+
+## 2026-10-09 — Event facets are a fixed column set under the current filters
+
+**Decision.** `GET /cases/{id}/events/facets` computes top-N values (default 20,
+max 100) for exactly five dimensions — `host`, `log_type`, `channel`, `user_name`
+and `src_ip` — plus `event_id`, whose facet values are returned as integers to
+match the list payload. Facets share every list filter except `limit`, and the
+values counted are the raw stored strings (empty/blank values are counted once
+under their verbatim value).
+
+**Why.** Spec 06 names this exact set and a top-N limit, and the list API needs a
+filterable count for each. Restricting the dimensions keeps the count query a
+single indexed `GROUP BY` and makes the aggregation behaviour (blanks included)
+explicit rather than guessed.
+
+**Cost.** A new facet dimension is a schema-owning change, not a query tweak; the
+field set is mirrored in `api_contract.txt` and would have to grow with the
+filters. `event_id` facets are ints, so a client must not compare them to the
+string form of the `event_id` filter.
+
+## 2026-10-09 — The rule catalogue syncs from disk on first run and on every import
+
+**Decision.** A fresh install starts with an empty `rules` table; the new
+`app/detect/sync.py:sync_catalogue` loads the shipped builtin and sigma trees
+plus the custom directory through the engine's own loader, upserts every loaded
+rule (preserving each row's `enabled` flag) and prunes stale shipped rows by id
+via `RuleRepository.delete_outside`, which never touches custom rows. It runs at
+startup only when `detection.sync_rules_on_startup` is on **and** the shipped
+rows count is zero, and `POST /rules/import` now uses the same path instead of
+upserting only custom rules.
+
+**Why.** Nothing ever seeded the catalogue, so a fresh install could run
+detection with zero rules. Running the 4-5 s tree load on every boot is
+pointless once rows exist — the shipped sets only change when the operator edits
+their own files or triggers an import — so the empty-catalogue gate makes later
+boots free and keeps the test suite (which opts out of the flag) fast. Routing
+every sync through `load_rules` means parse, compile and health are computed
+exactly as the Rules → Health view reports them, and importing a custom file no
+longer leaves the rest of the catalogue stale when a vendored rule was removed.
+
+**Cost.** The 4-5 s first boot is a visible startup pause, and there is no
+dedicated manual re-sync endpoint (the spec does not define one); re-syncing by
+hand means uploading a file through import or deleting the shipped rows.
+`api_contract.txt` stays unchanged because the existing endpoints just gain the
+`synced`/`stale_removed` response fields.
+
+## 2026-10-09 — The SigmaHQ sample is every routable detection rule at one pinned commit, capped for Windows
+
+**Decision.** `scripts/update_rules.py` vendors a downloaded SigmaHQ/sigma tree
+(dir or zip) into `backend/rules/sigma`. The sample is every detection rule
+that parses, compiles with `pysigma-backend-sqlite`, is not a correlation rule,
+and routes through the shipped `logsource_map.yaml`; the Windows slice is
+further spread across its first-level rule families with per-level caps
+(high 90, medium 70, critical 5, low 5). Files are copied byte-for-byte and
+multi-document files whole or not at all. `SOURCE.txt` records the upstream
+commit, the tree and source SHA-256 digests, and the per-category counts;
+`LICENSE` (DRL 1.1) sits next to the rules. Running the tool re-loads the
+result and asserts the digest is unchanged, so a rerun reproduces the tree
+exactly.
+
+**Why.** Spec 09 D-12 needs a compile-health floor of 200+ SigmaHQ rules
+without turning the repo into a SigmaHQ mirror. Every rule that parses,
+compiles and routes is safely runnable, so taking all of Linux/Web/network and
+the spread-capped Windows slice keeps the whole sample honest ("rules we can
+run") while staying reviewable. Excluding unroutable rules up front keeps the
+compile-health dashboard meaningful: a rule that cannot be run is a map gap,
+not rule health.
+
+**Cost.** The shipped logsource map cannot yet route most of `rules/network`
+(cisco/zeek/dns — 44 of 45 files unroutable) or service/product channels
+outside the selected Windows families, so the sample under-represents those
+products at this commit; adding them later is a logsource-map change, not a
+re-vendor. Rule content is imported wholesale from upstream, so DRL
+attribution relies on the vendored `LICENSE` and `SOURCE.txt`.
+
+**Buckets at commit `48f2d096` (2024-05-31).** 2514 rule files across
+`rules/{windows,linux,web,network}`: 114 fail to parse (all `obsoletes:`,
+which pySigma 1.5 rejects as an invalid Sigma type), 100 parse but are
+unroutable, 0 other compile failures, 374 vendored (Windows 147 across 15
+families, Linux 186, Web 40, network/firewall 1). Loading the vendored tree is
+deterministic — two loads produce identical rows.
+
 ## 2026-10-08 — The ambiguous-TLD penalty follows the acceptance path, not the suffix
 
 **Decision.** A domain whose TLD is also a common file extension keeps
@@ -700,3 +1190,57 @@ to ignore a red build.
 
 **Cost.** A performance regression is not caught by CI; it surfaces when someone
 runs `make perf`.
+
+## 2026-10-09 — Timeline buckets are span-driven with epoch alignment and alert counts
+
+**Decision.** `GET /cases/{id}/timeline` accepts `bucket=auto|1m|5m|1h|1d` and
+groups events on `((COALESCE(ts_ms,0)/bucket)*bucket)` so each bucket starts on
+an integer boundary (epoch-aligned). `alert_count` is the number of distinct
+events in that bucket that have at least one row in `alert_events` (joined
+while still applying every list filter, including `q` and IOC/alert link
+filters); the response emits only buckets that contain at least one event. For
+`auto`, the bucket size is the finest that fits the filtered span without
+exceeding one day for very large windows, with the `<=` thresholds (<= 15m →
+1m, <= 6h → 5m, <= 3d → 1h, else 1d); an empty filtered set falls back to
+`1m`.
+
+**Why.** Spec 06 requires `auto` and per-bucket splits by `log_type` and an
+`alert_count`. Aligning to epoch milliseconds lets bars line up cleanly and the
+SQL `GROUP BY` is trivial; counting distinct alert-linked events, rather than
+counting `alert_events` rows or alerts, matches the "alert_count" wording (events
+that are associated with at least one alert) and remains correct when one event
+links to several alerts or vice versa.
+
+**Cost.** Rows with no `ts_ms` sort into bucket `0`; there is no way to show them
+separately (the bucket still has `t_ms = 0`). A very large span always uses at
+least 1d, so granularity disappears — the thresholds are a compromise between
+chart readability and data volume.
+
+## 2026-10-09 — The audit-log endpoint walks the full chain and returns verification
+
+**Decision.** `GET /cases/{id}/audit-log` lists a page of the requested case's
+rows and, in the same response, returns a hash-chain verification of the *whole*
+`audit_log` (not just the page). Verification walks from id 1 onward, recomputes
+`sha256(prev_hash || ts || action || detail_json)` for each row and checks
+`prev_hash` against the previous verified hash; when `case_id` is supplied to
+`verify`, rows of other cases are still visited but their `hash` becomes the new
+`prev_hash` (they do not count towards `rows_checked`), so interleaved rows
+cannot allow the head of the requested case to be used to "bridge" a tampered
+row. The API stores hashes in `prev_hash` and `hash`, returns them verbatim on
+each entry, and the storage layer still aborts `UPDATE`/`DELETE` on `audit_log`
+via triggers (test-guarded).
+
+**Why.** Spec 10 requires that tampering be detectable and the per-case endpoint
+report the first broken row; a global hash chain means a row in one case's
+history cannot be edited without breaking the chain for later reads of that case
+and for any read that reaches past the edit. Walking the whole chain on every
+page call is cheap enough in practice for the small audit sets this tool will
+have (the repository does a single table scan in `iter_all`), and returning the
+hashes on entries lets the client re-verify the chain independently if desired.
+
+**Cost.** A very large `audit_log` (many 10s of thousands of rows across cases)
+makes every per-case audit page a full scan; if that becomes a problem the chain
+will need per-case checkpoints or head-of-case records, but that's not necessary
+for the spec's intent and current data volumes. `rows_checked` counts only rows
+belonging to the requested case.
+
