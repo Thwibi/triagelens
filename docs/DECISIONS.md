@@ -42,9 +42,16 @@ and spec 07/09 make the three scenarios and the S-02 render check normative at
 the browser level. An API-level-only pass left that requirement Partial.
 
 **Cost.** The suite needs a built frontend and a Chromium install, so it is
-heavier than the unit gates and is not folded into `make all`. Lighthouse a11y
-and the bundle-size budget (spec 07) remain unmeasured, as does the offline
-clean-machine install.
+heavier than the unit gates and is not folded into `make all`. The spec 07
+bundle-size budget is enforced separately (see below); the Lighthouse a11y check
+and the offline clean-machine install remain unrun.
+
+**Bundle budget (same day).** A `frontend-budget` task
+(`frontend/scripts/check-bundle-budget.mjs`, wired into `make build` and CI)
+gzips everything under `backend/app/static` and fails above 1.5 MB. The current
+build is 693 KB gzipped, so the budget is a regression guard rather than a
+constraint. Lighthouse a11y ≥ 95 is the remaining spec 07 check; it needs the
+`lighthouse` tool, which is not installed here.
 
 ## 2026-10-11 — Closing the 9f gaps: coverage, socket guard, licences, CI
 

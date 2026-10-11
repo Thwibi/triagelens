@@ -77,8 +77,10 @@ No literal "MUST" tokens; the per-format tables are normative. Covered by
 
 No literal "MUST" tokens; the screen tables are normative. Covered by frontend
 Vitest suites (30 files) and, for the browser-level acceptance, the Playwright
-E2E scenarios (spec 09 §7) under `frontend/e2e/` (see Gaps for the a11y/bundle
-checks that remain unmeasured).
+E2E scenarios (spec 09 §7) under `frontend/e2e/`. The bundle-size budget
+(< 1.5 MB gzipped) is enforced by `scripts/task.py frontend-budget`
+(`frontend/scripts/check-bundle-budget.mjs`, run in CI); the Lighthouse a11y
+check remains unmeasured (see Gaps).
 
 ## 08 — Reporting and export
 
@@ -183,10 +185,10 @@ These are the requirements the matrix marks Partial/Gap. They are known and
 intentional at this point, and are tracked in `docs/STATUS.md`; fixing them is the
 remaining work.
 
-1. **UI audits not run.** The spec 09 §7 scenarios and the S-02 render check now
-   run at the browser level (`frontend/e2e/`, four Playwright tests), but the
-   Lighthouse a11y ≥ 95 check and the bundle-size budget (spec 07) have no harness
-   here (Lighthouse is not installed).
+1. **Lighthouse a11y check not run.** The spec 09 §7 scenarios, the S-02 render
+   check (`frontend/e2e/`, four Playwright tests) and the spec 07 bundle-size
+   budget (`frontend-budget` task) all run, but the Lighthouse accessibility ≥ 95
+   check has no harness here (Lighthouse is not installed).
 2. **Offline clean-machine install not executed.** `make package` and the
    installer exist, but the bundle was not installed on a separate
    network-disabled machine.
@@ -204,6 +206,7 @@ remaining work.
 make all                 # lint, typecheck, test on both sides
 make backend-coverage    # backend coverage floor
 make e2e                 # build the app and run the browser E2E suite
+make frontend-budget     # enforce the spec 07 bundle-size budget (after a build)
 make perf                # refresh docs/perf-results.md
 python scripts/task.py scripts-lint
 cd frontend && npx --no-install vitest --run

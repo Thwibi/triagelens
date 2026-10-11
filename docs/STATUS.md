@@ -50,9 +50,10 @@ environment are in `docs/COMPLIANCE.md`; the open gaps are listed below.
 | Frontend types | `npx --no-install tsc --build --force` (in `frontend/`) | clean |
 | Frontend tests | `npx --no-install vitest --run` (in `frontend/`) | 232 passed (30 files) |
 | Browser E2E | `python scripts\task.py e2e` (builds the app, then Playwright) | 4 passed — Scenarios A/B/C + the S-02 XSS render check (spec 09 §7); Chromium headless |
+| Bundle budget | `python scripts\task.py frontend-budget` (after a build) | 693 KB gzipped vs the 1.5 MB spec 07 budget (PASS) |
 | Benchmarks | `.venv\Scripts\python.exe scripts\task.py perf` | 15 primitive benchmarks, refreshed `docs/perf-results.md` |
 | Audits | `npm audit --audit-level=high` (in `frontend/`) | 0 vulnerabilities; `pip-audit` is wired into `.github/workflows/ci.yml` but not run here (not installed) |
-| CI | `.github/workflows/ci.yml` | backend lint/typecheck/coverage, frontend lint/typecheck/test/`npm audit`, a `pip-audit` job, and a browser `e2e` job; not yet executed on a runner |
+| CI | `.github/workflows/ci.yml` | backend lint/typecheck/coverage, frontend lint/typecheck/test/`npm audit`/bundle budget, a `pip-audit` job, and a browser `e2e` job; not yet executed on a runner |
 
 ### Known limitations
 
@@ -179,10 +180,10 @@ service it needs; see the 2026-10-10 decision.
   Vacuum, Rebuild-search-index, Verify-evidence-hashes and Verify-audit-chain
   actions were added in phase 9 slice 9d. The audit viewer is case-scoped
   (`GET /cases/{id}/audit-log`), so it asks for a case.
-- Screenshots and the accessibility/bundle-size budget check are still absent; the
-  browser E2E suite now exists (`frontend/e2e/`, spec 09 §7 scenarios + the S-02
-  render check), but spec 07's Lighthouse a11y ≥ 95 and < 1.5 MB gzipped budget
-  are unmeasured.
+- Screenshots and the Lighthouse accessibility check are still absent; the browser
+  E2E suite (`frontend/e2e/`, spec 09 §7 scenarios + the S-02 render check) and
+  the spec 07 < 1.5 MB gzipped bundle budget (`frontend-budget` task) now run, but
+  the Lighthouse a11y ≥ 95 check is unmeasured.
 
 ## Phase 6 — Detection engine (implemented)
 

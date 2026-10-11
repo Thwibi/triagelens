@@ -10,6 +10,7 @@ TASK := $(PYTHON) scripts/task.py
 .PHONY: help install backend-install frontend-install lint typecheck test build all \
         backend-lint backend-format backend-typecheck backend-test backend-coverage \
         frontend-lint frontend-typecheck frontend-test frontend-build e2e \
+        frontend-budget \
         backend-lock lock-check scripts-lint dev backend-run docker-build clean
 
 help: ## Show this help
@@ -84,6 +85,9 @@ frontend-build: ## Build the frontend into backend/app/static
 
 e2e: ## Build the app and run the browser E2E suite (Playwright)
 	$(TASK) e2e
+
+frontend-budget: ## Enforce the spec 07 bundle-size budget on the built frontend
+	$(TASK) frontend-budget
 
 dev: ## Run the Vite dev server with the API proxied
 	$(TASK) dev

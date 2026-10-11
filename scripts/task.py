@@ -278,6 +278,15 @@ def task_e2e() -> int:
     return _run([_npm(), "run", "e2e"], cwd=FRONTEND)
 
 
+def task_frontend_budget() -> int:
+    """Enforce the spec 07 bundle-size budget on the built frontend.
+
+    Gzips everything under ``backend/app/static`` and fails above 1.5 MB, so it
+    must run after a build (``frontend-build``/``e2e`` produce one).
+    """
+    return _run([_npm(), "run", "budget"], cwd=FRONTEND)
+
+
 def task_dev() -> int:
     """Run the Vite dev server with the API proxied to port 8787."""
     return _run([_npm(), "run", "dev"], cwd=FRONTEND)
@@ -326,6 +335,7 @@ def task_build() -> int:
         task_frontend_typecheck,
         task_frontend_test,
         task_frontend_build,
+        task_frontend_budget,
     ):
         code = step()
         if code:
@@ -401,6 +411,7 @@ TASKS: dict[str, Callable[[], int]] = {
     "frontend-typecheck": task_frontend_typecheck,
     "frontend-test": task_frontend_test,
     "frontend-build": task_frontend_build,
+    "frontend-budget": task_frontend_budget,
     "e2e": task_e2e,
     "openapi": task_openapi,
     "openapi-check": task_openapi_check,

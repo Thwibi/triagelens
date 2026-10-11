@@ -56,6 +56,12 @@ jobs:
       - name: Unit tests (vitest)
         working-directory: frontend
         run: npm run test
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+      - name: Bundle-size budget (spec 07)
+        working-directory: frontend
+        run: npm run budget
       - name: Dependency audit (npm)
         working-directory: frontend
         run: npm audit --audit-level=high
