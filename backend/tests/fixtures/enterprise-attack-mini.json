@@ -1,0 +1,224 @@
+{
+  "type": "bundle",
+  "id": "bundle--triagelens-fixture-0001",
+  "x_mitre_version": "16.1.0",
+  "objects": [
+    {
+      "type": "x-mitre-tactic",
+      "id": "x-mitre-tactic--fixture-execution",
+      "name": "Execution",
+      "x_mitre_shortname": "execution",
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "TA0002",
+          "url": "https://attack.mitre.org/tactics/TA0002"
+        }
+      ]
+    },
+    {
+      "type": "x-mitre-tactic",
+      "id": "x-mitre-tactic--fixture-persistence",
+      "name": "Persistence",
+      "x_mitre_shortname": "persistence",
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "TA0003",
+          "url": "https://attack.mitre.org/tactics/TA0003"
+        }
+      ]
+    },
+    {
+      "type": "x-mitre-tactic",
+      "id": "x-mitre-tactic--fixture-credaccess",
+      "name": "Credential Access",
+      "x_mitre_shortname": "credential-access",
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "TA0006",
+          "url": "https://attack.mitre.org/tactics/TA0006"
+        }
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--fixture-t1059",
+      "name": "Command and Scripting Interpreter",
+      "description": "Interpreters and command-line shells.",
+      "x_mitre_is_subtechnique": false,
+      "x_mitre_platforms": ["Windows", "Linux", "macOS"],
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "execution"},
+        {"kill_chain_name": "mitre-attack", "phase_name": "persistence"}
+      ],
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1059",
+          "url": "https://attack.mitre.org/techniques/T1059"
+        }
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--fixture-t1059-001",
+      "name": "PowerShell",
+      "description": "PowerShell execution.",
+      "x_mitre_is_subtechnique": true,
+      "x_mitre_platforms": ["Windows"],
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "execution"}
+      ],
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1059.001",
+          "url": "https://attack.mitre.org/techniques/T1059/001"
+        }
+      ]
+    },
+    {
+      "type": "relationship",
+      "id": "relationship--fixture-1",
+      "relationship_type": "subtechnique-of",
+      "source_ref": "attack-pattern--fixture-t1059-001",
+      "target_ref": "attack-pattern--fixture-t1059"
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--fixture-t1110",
+      "name": "Brute Force",
+      "x_mitre_is_subtechnique": false,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "credential-access"}
+      ],
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1110",
+          "url": "https://attack.mitre.org/techniques/T1110"
+        }
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--fixture-t1110-001",
+      "name": "Password Guessing",
+      "x_mitre_is_subtechnique": true,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "credential-access"}
+      ],
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1110.001",
+          "url": "https://attack.mitre.org/techniques/T1110/001"
+        }
+      ]
+    },
+    {
+      "type": "relationship",
+      "id": "relationship--fixture-2",
+      "relationship_type": "subtechnique-of",
+      "source_ref": "attack-pattern--fixture-t1110-001",
+      "target_ref": "attack-pattern--fixture-t1110"
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--fixture-t1070",
+      "name": "Indicator Removal on Host",
+      "x_mitre_is_subtechnique": false,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "defense-evasion"}
+      ],
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1070",
+          "url": "https://attack.mitre.org/techniques/T1070"
+        }
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--fixture-t1070-001",
+      "name": "Clear Windows Event Logs",
+      "x_mitre_is_subtechnique": true,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "defense-evasion"}
+      ],
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1070.001",
+          "url": "https://attack.mitre.org/techniques/T1070/001"
+        }
+      ]
+    },
+    {
+      "type": "relationship",
+      "id": "relationship--fixture-3",
+      "relationship_type": "subtechnique-of",
+      "source_ref": "attack-pattern--fixture-t1070-001",
+      "target_ref": "attack-pattern--fixture-t1070"
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--fixture-deprecated",
+      "name": "Deprecated Pattern",
+      "x_mitre_deprecated": true,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "persistence"}
+      ],
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T9998",
+          "url": "https://attack.mitre.org/techniques/T9998"
+        }
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--fixture-revoked",
+      "name": "Revoked Pattern",
+      "revoked": true,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "persistence"}
+      ],
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T9997",
+          "url": "https://attack.mitre.org/techniques/T9997"
+        }
+      ]
+    },
+    {
+      "type": "intrusion-set",
+      "id": "intrusion-set--fixture-apt",
+      "name": "Fixture Group",
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "G0032",
+          "url": "https://attack.mitre.org/groups/G0032"
+        }
+      ]
+    },
+    {
+      "type": "malware",
+      "id": "malware--fixture-malware",
+      "name": "Fixture Malware",
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "S0002",
+          "url": "https://attack.mitre.org/software/S0002"
+        }
+      ]
+    }
+  ]
+}

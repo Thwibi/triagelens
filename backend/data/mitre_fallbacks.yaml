@@ -1,0 +1,19 @@
+# Fallback ATT&CK mappings (spec 04 section 7.3).
+# Consulted only when a rule's own tags map nothing; results are labelled
+# source: fallback ("inferred" in the UI).
+- when: { channel: Security, event_id: 1102 }   # audit log cleared
+  techniques: [T1070.001]
+- when: { channel: System, event_id: 104 }      # event log cleared
+  techniques: [T1070.001]
+- when: { channel: Security, event_id: 4720 }   # account created
+  techniques: [T1136.001]
+- when: { channel: Security, event_id: 4698 }   # scheduled task created
+  techniques: [T1053.005]
+- when: { channel: System, event_id: 7045 }     # service installed
+  techniques: [T1543.003]
+- when: { event_action: ssh_failed_password }   # password guessing
+  techniques: [T1110.001]
+- when: { event_action: user_added }            # account added
+  techniques: [T1136.001]
+- when: { event_action: crontab_modified }      # persistence via cron
+  techniques: [T1053.003]

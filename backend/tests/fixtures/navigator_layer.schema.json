@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/mitre-attack/attack-navigator/master/layers/layerformat_4_5.json",
+  "title": "ATT&CK Navigator layer 4.5 (subset vendored for TriageLens)",
+  "type": "object",
+  "required": [
+    "name",
+    "versions",
+    "domain",
+    "techniques",
+    "gradient",
+    "layout",
+    "filters"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "name": {"type": "string", "minLength": 1},
+    "versions": {
+      "type": "object",
+      "required": ["attack", "navigator", "layer"],
+      "additionalProperties": false,
+      "properties": {
+        "attack": {"type": "string"},
+        "navigator": {"type": "string"},
+        "layer": {"type": "string"}
+      }
+    },
+    "domain": {
+      "type": "string",
+      "enum": ["enterprise-attack", "mobile-attack", "ics-attack"]
+    },
+    "description": {"type": "string"},
+    "filters": {
+      "type": "object",
+      "required": ["platforms"],
+      "additionalProperties": true,
+      "properties": {
+        "platforms": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "sorting": {"type": "integer", "minimum": 0, "maximum": 3},
+    "layout": {
+      "type": "object",
+      "required": ["layout", "aggregateFunction"],
+      "additionalProperties": true,
+      "properties": {
+        "layout": {"type": "string", "enum": ["side", "mini", "none"]},
+        "aggregateFunction": {"type": "string", "enum": ["average", "min", "max"]},
+        "showID": {"type": "boolean"},
+        "showName": {"type": "boolean"},
+        "showAggregateScores": {"type": "boolean"},
+        "countUnscored": {"type": "boolean"}
+      }
+    },
+    "hideDisabled": {"type": "boolean"},
+    "techniques": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["techniqueID"],
+        "additionalProperties": true,
+        "properties": {
+          "techniqueID": {
+            "type": "string",
+            "pattern": "^T\\d{4}(\\.\\d{3})?$"
+          },
+          "tactic": {"type": "string"},
+          "score": {"type": ["integer", "null"]},
+          "color": {"type": "string"},
+          "comment": {"type": "string"},
+          "enabled": {"type": "boolean"},
+          "metadata": {"type": "array"},
+          "links": {"type": "array"},
+          "showSubtechniques": {"type": "boolean"}
+        }
+      }
+    },
+    "gradient": {
+      "type": "object",
+      "required": ["colors", "minValue", "maxValue"],
+      "additionalProperties": true,
+      "properties": {
+        "colors": {
+          "type": "array",
+          "minItems": 2,
+          "items": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"}
+        },
+        "minValue": {"type": "number"},
+        "maxValue": {"type": "number"}
+      }
+    },
+    "legendItems": {"type": "array"},
+    "metadata": {"type": "array"},
+    "links": {"type": "array"},
+    "showTacticRowBackground": {"type": "boolean"},
+    "tacticRowBackground": {"type": "string"},
+    "selectTechniquesAcrossTactics": {"type": "boolean"},
+    "selectSubtechniquesWithParent": {"type": "boolean"}
+  }
+}
