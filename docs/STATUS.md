@@ -41,15 +41,15 @@ environment are in `docs/COMPLIANCE.md`; the open gaps are listed below.
 
 | Gate | Command | Result |
 |---|---|---|
-| Backend lint | `.venv\Scripts\python.exe scripts\task.py backend-lint` | clean (ruff check + format check, 195 files) |
-| Backend types | `.venv\Scripts\python.exe scripts\task.py backend-typecheck` | clean (mypy, 209 source files) |
+| Backend lint | `.venv\Scripts\python.exe scripts\task.py backend-lint` | clean (ruff check + format check, 196 files) |
+| Backend types | `.venv\Scripts\python.exe scripts\task.py backend-typecheck` | clean (mypy, 210 source files) |
 | Backend tests | `.venv\Scripts\python.exe scripts\task.py backend-test` | 1818 passed, 1 skipped |
 | Backend coverage | `.venv\Scripts\python.exe scripts\task.py backend-coverage` | 89.56% overall (80% floor met); `parsers` 88%, `detect` 92%, `ioc` 93%, `mitre` 94% — all four spec 00 packages ≥ 85% (vendored `evtxlib/` omitted, as from ruff/mypy) |
 | Scripts lint | `.venv\Scripts\python.exe scripts\task.py scripts-lint` | clean (ruff check + format check, 11 files) |
 | Frontend lint | `npx --no-install eslint . --max-warnings 0` (in `frontend/`) | clean |
 | Frontend types | `npx --no-install tsc --build --force` (in `frontend/`) | clean |
 | Frontend tests | `npx --no-install vitest --run` (in `frontend/`) | 232 passed (30 files) |
-| Browser E2E | `python scripts\task.py e2e` (builds the app, then Playwright) | 4 passed — Scenarios A/B/C + the S-02 XSS render check (spec 09 §7); Chromium headless |
+| Browser E2E | `python scripts\task.py e2e` (builds the app, then Playwright) | 5 passed — Scenarios A/B/C + the S-02 XSS render check (spec 09 §7) + the axe-core a11y scan of the 13 main screens; Chromium headless |
 | Bundle budget | `python scripts\task.py frontend-budget` (after a build) | 693 KB gzipped vs the 1.5 MB spec 07 budget (PASS) |
 | Benchmarks | `.venv\Scripts\python.exe scripts\task.py perf` | 15 primitive benchmarks, refreshed `docs/perf-results.md` |
 | Audits | `npm audit --audit-level=high` (in `frontend/`) | 0 vulnerabilities; `pip-audit` is wired into `.github/workflows/ci.yml` but not run here (not installed) |
