@@ -1,53 +1,47 @@
 import type { ReactElement } from 'react'
-import { NavLink, Route, Routes } from 'react-router-dom'
+import { Route, Routes } from 'react-router-dom'
 
-import { StatusPage } from './features/status/StatusPage'
+import { AppShell } from './components/AppShell'
 import { NotFoundPage } from './features/errors/NotFoundPage'
+import { AlertsPage } from './features/alerts/AlertsPage'
+import { CasesPage } from './features/cases/CasesPage'
+import { EventsPage } from './features/events/EventsPage'
+import { EntitiesPage } from './features/entities/EntitiesPage'
+import { IocsPage } from './features/iocs/IocsPage'
+import { MitrePage } from './features/mitre/MitrePage'
+import { OverviewPage } from './features/overview/OverviewPage'
+import { ReportsPage } from './features/reports/ReportsPage'
+import { RulesPage } from './features/rules/RulesPage'
+import { SettingsPage } from './features/settings/SettingsPage'
+import { SourcesPage } from './features/sources/SourcesPage'
+import { StatusPage } from './features/status/StatusPage'
+import { TimelinePage } from './features/timeline/TimelinePage'
 
 /**
- * Application shell.
+ * Route table.
  *
- * Only routes that exist are registered: Phase 0 ships the status view, and any
- * other URL lands on a real not-found page rather than an empty stub. Navigation
- * entries are derived from the registered routes so the menu cannot advertise
- * a page that does not exist.
+ * Only screens that exist are registered; every other URL lands on a real
+ * not-found page rather than an empty stub (see `app/navigation.ts`).
  */
-const ROUTES = [{ path: '/', label: 'Status', end: true }] as const
-
-const NAV_LINK_CLASS = ({ isActive }: { isActive: boolean }): string =>
-  isActive
-    ? 'rounded bg-slate-800 px-3 py-1.5 text-sm text-slate-100'
-    : 'rounded px-3 py-1.5 text-sm text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-
 export function App(): ReactElement {
   return (
-    <div className="mx-auto flex min-h-full max-w-4xl flex-col gap-6 p-6">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight text-slate-100">TriageLens</h1>
-          <p className="text-xs text-slate-500">Local log triage. Nothing leaves this machine.</p>
-        </div>
-        <nav aria-label="Sections" className="flex gap-1">
-          {ROUTES.map((route) => (
-            <NavLink key={route.path} to={route.path} end={route.end} className={NAV_LINK_CLASS}>
-              {route.label}
-            </NavLink>
-          ))}
-        </nav>
-      </header>
-
-      <main className="flex-1">
-        <Routes>
-          <Route path="/" element={<StatusPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </main>
-
-      <footer className="border-t border-slate-800 pt-3 text-xs text-slate-600">
-        Offline by design: no telemetry, no outbound requests, no external assets.
-      </footer>
-    </div>
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route path="/" element={<CasesPage />} />
+        <Route path="/status" element={<StatusPage />} />
+        <Route path="/cases/:caseId" element={<OverviewPage />} />
+        <Route path="/cases/:caseId/sources" element={<SourcesPage />} />
+        <Route path="/cases/:caseId/events" element={<EventsPage />} />
+        <Route path="/cases/:caseId/timeline" element={<TimelinePage />} />
+        <Route path="/cases/:caseId/alerts" element={<AlertsPage />} />
+        <Route path="/cases/:caseId/iocs" element={<IocsPage />} />
+        <Route path="/cases/:caseId/mitre" element={<MitrePage />} />
+        <Route path="/cases/:caseId/entities" element={<EntitiesPage />} />
+        <Route path="/cases/:caseId/rules" element={<RulesPage />} />
+        <Route path="/cases/:caseId/reports" element={<ReportsPage />} />
+        <Route path="/cases/:caseId/settings" element={<SettingsPage />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Route>
+    </Routes>
   )
 }
-
-export { ROUTES }

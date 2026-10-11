@@ -1,12 +1,68 @@
 @import 'tailwindcss';
 
+/*
+ * Design tokens (spec 07 section 1).
+ *
+ * The raw values live on :root (dark default) and [data-theme='light']; the
+ * Tailwind theme maps utility names onto those variables so `bg-surface` and
+ * friends follow the active theme without a second class name. Custom property
+ * substitution is lazy, so a utility referencing `var(--surface)` re-resolves
+ * when the theme attribute flips.
+ */
 @theme {
-  --font-sans: ui-sans-serif, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
+    'Liberation Mono', monospace;
+
+  --radius-card: 6px;
+  --radius-control: 6px;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+
+  --color-sev-critical: var(--sev-critical);
+  --color-sev-high: var(--sev-high);
+  --color-sev-medium: var(--sev-medium);
+  --color-sev-low: var(--sev-low);
+  --color-sev-info: var(--sev-info);
 }
 
 :root {
   color-scheme: dark;
+  --bg: #0e1116;
+  --surface: #151a21;
+  --surface-2: #1c232c;
+  --border: #2a333f;
+  --text: #e6edf3;
+  --muted: #8b98a5;
+  --accent: #2dd4bf;
+  --sev-critical: #f43f5e;
+  --sev-high: #f97316;
+  --sev-medium: #eab308;
+  --sev-low: #38bdf8;
+  --sev-info: #94a3b8;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f6f8fa;
+  --surface: #ffffff;
+  --surface-2: #eef1f5;
+  --border: #d5dbe3;
+  --text: #1b2430;
+  --muted: #5b6776;
+  --accent: #0f9d8f;
+  --sev-critical: #dc2646;
+  --sev-high: #d9600a;
+  --sev-medium: #b98a00;
+  --sev-low: #1d8fd0;
+  --sev-info: #64748b;
 }
 
 html,
@@ -17,13 +73,15 @@ body,
 
 body {
   margin: 0;
-  background-color: var(--color-slate-950);
-  color: var(--color-slate-100);
+  background-color: var(--bg);
+  color: var(--text);
   font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Respect the OS reduced-motion setting; Tailwind's animate-pulse is opt-in. */
+/* Respect the OS reduced-motion setting. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -34,8 +92,8 @@ body {
   }
 }
 
-/* Keyboard users must always see the focus ring. */
+/* Keyboard users must always see the focus ring (spec 07 section 1). */
 :focus-visible {
-  outline: 2px solid var(--color-sky-400);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }

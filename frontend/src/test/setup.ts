@@ -35,5 +35,33 @@ function stubMatchMedia(): void {
     },
   })
 }
-
 stubMatchMedia()
+
+/**
+ * jsdom does not implement `ResizeObserver`.
+ *
+ * CodeMirror and the virtualized table observe element resizes; a no-op stub is
+ * enough because the tests drive sizing with explicit mocks where it matters.
+ */
+function stubResizeObserver(): void {
+  if ('ResizeObserver' in globalThis) {
+    return
+  }
+  class ResizeObserverStub {
+    observe(): void {
+      return undefined
+    }
+    unobserve(): void {
+      return undefined
+    }
+    disconnect(): void {
+      return undefined
+    }
+  }
+  Object.defineProperty(globalThis, 'ResizeObserver', {
+    writable: true,
+    value: ResizeObserverStub,
+  })
+}
+
+stubResizeObserver()

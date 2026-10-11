@@ -19,6 +19,9 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5173,
     strictPort: true,
+    // The About dialog bundles THIRD_PARTY_NOTICES.md from the repository root
+    // (one directory up), so the dev/test file server must reach it.
+    fs: { allow: ['..'] },
     proxy: {
       '/api': { target: API_TARGET, changeOrigin: false },
     },

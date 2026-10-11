@@ -60,3 +60,59 @@ export function truncate(value: string, max: number): string {
   }
   return value.length <= max ? value : `${value.slice(0, max - 1)}…`
 }
+
+/** Thousands-separated integer, with a sane fallback for non-finite input. */
+export function formatNumber(value: number): string {
+  return Number.isFinite(value) ? value.toLocaleString() : '0'
+}
+
+/** Render an epoch-millisecond timestamp in the viewer's local timezone. */
+export function formatTimestamp(ms: number | null): string {
+  if (ms === null || !Number.isFinite(ms)) {
+    return '—'
+  }
+  return new Date(ms).toLocaleString()
+}
+
+/** Compact "how long ago", used for freshness hints and job rows. */
+export function formatSince(epochMs: number | null, now: number = Date.now()): string {
+  if (epochMs === null || !Number.isFinite(epochMs)) {
+    return '—'
+  }
+  const seconds = Math.max(0, Math.round((now - epochMs) / 1000))
+  if (seconds < 60) {
+    return `${seconds}s ago`
+  }
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) {
+    return `${minutes}m ago`
+  }
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) {
+    return `${hours}h ago`
+  }
+  return `${Math.round(hours / 24)}d ago`
+}
+
+/** A fraction in `[0, 1]` as a whole-number percentage. */
+export function formatPercent(fraction: number): string {
+  if (!Number.isFinite(fraction)) {
+    return '0%'
+  }
+  return `${Math.round(Math.min(Math.max(fraction, 0), 1) * 100)}%`
+}
+
+/**
+ * Make an indicator safe to paste into a chat or ticket (spec 07 sections 3.6
+ * and 4).
+ *
+ * Dots in hostnames, IPs and paths become `[.]` and a leading `http`/`https`
+ * scheme becomes `hxxp`, which stops most linkifiers from turning a malicious
+ * value into a live link. Hashes and other dot-free values are unchanged.
+ */
+export function defang(value: string): string {
+  return value
+    .replace(/^http(s?):\/\//i, (_match, secure: string) => (secure.length > 0 ? 'hxxps[://]' : 'hxxp[://]'))
+    .replace(/\./g, '[.]')
+    .replace(/@/g, '[at]')
+}

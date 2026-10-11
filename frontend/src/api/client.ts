@@ -175,3 +175,217 @@ export function parseHealthReport(body: unknown): HealthReport {
 export async function fetchHealth(options: { readonly signal?: AbortSignal; readonly fetchImpl?: FetchLike } = {}): Promise<HealthReport> {
   return parseHealthReport(await getJson('/api/health', options))
 }
+
+/** Options shared by every mutating request. */
+export interface RequestOptions {
+  readonly signal?: AbortSignal
+  readonly timeoutMs?: number
+  readonly fetchImpl?: FetchLike
+}
+
+/** A JSON request body the caller has already shaped for the wire. */
+export interface JsonRequestOptions extends RequestOptions {
+  readonly json?: unknown
+  readonly method?: 'POST' | 'PATCH' | 'PUT' | 'DELETE'
+}
+
+/**
+ * Perform a mutating request and return the parsed body.
+ *
+ * Kept separate from `getJson` so the GET path (with its contract-specific
+ * handling) cannot regress when a new verb is added; both go through the same
+ * timeout, envelope parsing and abort semantics.
+ */
+export async function requestJson(path: string, options: JsonRequestOptions = {}): Promise<unknown> {
+  const doFetch = options.fetchImpl ?? ((input, init) => fetch(input, init))
+  const controller = new AbortController()
+  const timeout = setTimeout(() => {
+    controller.abort()
+  }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+
+  const onExternalAbort = (): void => {
+    controller.abort()
+  }
+  options.signal?.addEventListener('abort', onExternalAbort)
+
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  let body: BodyInit | null = null
+  if (options.json !== undefined) {
+    headers['Content-Type'] = 'application/json'
+    body = JSON.stringify(options.json)
+  }
+
+  try {
+    const response = await doFetch(path, {
+      method: options.method ?? 'POST',
+      headers,
+      body,
+      credentials: 'same-origin',
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+    const parsed = await readBody(response)
+    if (!response.ok) {
+      throw new ApiError(response.status, parseErrorEnvelope(parsed))
+    }
+    return parsed
+  } finally {
+    clearTimeout(timeout)
+    options.signal?.removeEventListener('abort', onExternalAbort)
+  }
+}
+
+/**
+ * Upload a `multipart/form-data` body.
+ *
+ * The `Content-Type` header is deliberately omitted so the browser sets it with
+ * the correct boundary; a manual header would corrupt the request.
+ */
+export async function requestForm(
+  path: string,
+  form: FormData,
+  options: RequestOptions = {},
+): Promise<unknown> {
+  const doFetch = options.fetchImpl ?? ((input, init) => fetch(input, init))
+  const controller = new AbortController()
+  const timeout = setTimeout(() => {
+    controller.abort()
+  }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+
+  const onExternalAbort = (): void => {
+    controller.abort()
+  }
+  options.signal?.addEventListener('abort', onExternalAbort)
+
+  try {
+    const response = await doFetch(path, {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      body: form,
+      credentials: 'same-origin',
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+    const parsed = await readBody(response)
+    if (!response.ok) {
+      throw new ApiError(response.status, parseErrorEnvelope(parsed))
+    }
+    return parsed
+  } finally {
+    clearTimeout(timeout)
+    options.signal?.removeEventListener('abort', onExternalAbort)
+  }
+}
+
+/** A downloaded file: its bytes plus the server-suggested filename, if any. */
+export interface DownloadedFile {
+  readonly blob: Blob
+  readonly filename: string | null
+}
+
+/** Pull the filename out of a `Content-Disposition` attachment header. */
+function filenameFromHeaders(headers: Headers): string | null {
+  const disposition = headers.get('Content-Disposition')
+  if (disposition === null) {
+    return null
+  }
+  const match = /filename="?([^";]+)"?/i.exec(disposition)
+  return match?.[1] ?? null
+}
+
+/**
+ * POST a JSON body and read the response as a downloaded file.
+ *
+ * The IOC export endpoints answer with `text/csv`, `application/json`, etc. and
+ * a `Content-Disposition` attachment; parsing them as JSON would corrupt the
+ * payload, so this path never touches `readBody`.
+ */
+export async function postForFile(
+  path: string,
+  json: unknown,
+  options: RequestOptions = {},
+): Promise<DownloadedFile> {
+  const doFetch = options.fetchImpl ?? ((input, init) => fetch(input, init))
+  const controller = new AbortController()
+  const timeout = setTimeout(() => {
+    controller.abort()
+  }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+
+  const onExternalAbort = (): void => {
+    controller.abort()
+  }
+  options.signal?.addEventListener('abort', onExternalAbort)
+
+  try {
+    const response = await doFetch(path, {
+      method: 'POST',
+      headers: { Accept: '*/*', 'Content-Type': 'application/json' },
+      body: JSON.stringify(json),
+      credentials: 'same-origin',
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      throw new ApiError(response.status, parseErrorEnvelope(await readBody(response)))
+    }
+    return { blob: await response.blob(), filename: filenameFromHeaders(response.headers) }
+  } finally {
+    clearTimeout(timeout)
+    options.signal?.removeEventListener('abort', onExternalAbort)
+  }
+}
+
+/**
+ * GET a path and read the response as a downloaded file.
+ *
+ * `GET /rules/export` answers with a zip and a `Content-Disposition`
+ * attachment; parsing it as JSON would corrupt the archive.
+ */
+export async function getForFile(
+  path: string,
+  options: RequestOptions = {},
+): Promise<DownloadedFile> {
+  const doFetch = options.fetchImpl ?? ((input, init) => fetch(input, init))
+  const controller = new AbortController()
+  const timeout = setTimeout(() => {
+    controller.abort()
+  }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+
+  const onExternalAbort = (): void => {
+    controller.abort()
+  }
+  options.signal?.addEventListener('abort', onExternalAbort)
+
+  try {
+    const response = await doFetch(path, {
+      method: 'GET',
+      headers: { Accept: '*/*' },
+      credentials: 'same-origin',
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      throw new ApiError(response.status, parseErrorEnvelope(await readBody(response)))
+    }
+    return { blob: await response.blob(), filename: filenameFromHeaders(response.headers) }
+  } finally {
+    clearTimeout(timeout)
+    options.signal?.removeEventListener('abort', onExternalAbort)
+  }
+}
+
+/** Raise a `ContractError` unless the body is a non-null object. */
+export function expectRecord(body: unknown, what: string): Record<string, unknown> {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    throw new ContractError(`${what} response must be a JSON object`, '<root>')
+  }
+  return body as Record<string, unknown>
+}
+
+/** Raise a `ContractError` unless the body is an array. */
+export function expectArray(body: unknown, what: string): readonly unknown[] {
+  if (!Array.isArray(body)) {
+    throw new ContractError(`${what} response must be a JSON array`, '<root>')
+  }
+  return body
+}

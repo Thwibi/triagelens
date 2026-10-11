@@ -12,6 +12,8 @@ export default tseslint.config(
       '../backend/app/static/**',
       'coverage/**',
       '**/*.tsbuildinfo',
+      // Generated from the backend OpenAPI document; do not hand-edit or lint.
+      'src/api/openapi.d.ts',
     ],
   },
   js.configs.recommended,
