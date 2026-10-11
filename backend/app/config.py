@@ -188,6 +188,9 @@ class DetectionConfig(_Section):
 
     profile: Literal["fast", "standard", "full"] = "standard"
     auto_run_after_ingest: bool = True
+    #: Seeds the shipped rule tree into the catalogue when it is empty (first run).
+    #: Restarts skip the 4-5 s load once rows exist, and ``enabled`` flags survive.
+    sync_rules_on_startup: bool = True
     max_sample_events_per_alert: int = Field(default=500, ge=0)
     rule_timeout_seconds: int = Field(default=120, gt=0)
     alert_group_window_minutes: int = Field(default=60, gt=0)

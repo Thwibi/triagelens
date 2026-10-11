@@ -34,6 +34,7 @@ from app.api.deps import (
     write_in,
 )
 from app.config import Settings
+from app.db.repositories.audit import AuditRepository
 from app.db.repositories.events import EventRepository
 from app.db.repositories.iocs import IocRepository
 from app.db.repositories.jobs import JobRepository
@@ -403,7 +404,10 @@ def delete_source(
         request,
         lambda connection: _delete_on_connection(connection, source_id),
     )
-    remove_stored(_source_dir(settings, case_id, source_id))
+    remove_stored(
+        _source_dir(settings, case_id, source_id),
+        secure=settings.storage.secure_delete,
+    )
     return {"id": source_id, "deleted": True}
 
 
@@ -415,7 +419,9 @@ def _delete_on_connection(connection: sqlite3.Connection, source_id: str) -> str
 
     The indicators this source's events touched are snapshotted first and
     recounted after: the delete cascades their occurrence rows away, and an
-    indicator left with none is orphaned rather than merely stale.
+    indicator left with none is orphaned rather than merely stale. A
+    ``source_deleted`` row is appended to the audit chain in the same
+    transaction (spec 02 section 4).
     """
     sources = SourceRepository(connection)
     record = _require_source(sources, source_id)
@@ -423,6 +429,11 @@ def _delete_on_connection(connection: sqlite3.Connection, source_id: str) -> str
     affected = iocs.snapshot_for_source(source_id)
     sources.delete(source_id)
     iocs.recompute(affected)
+    AuditRepository(connection).append(
+        "source_deleted",
+        case_id=str(record.case_id),
+        detail={"source_id": source_id, "filename": record.filename},
+    )
     return str(record.case_id)
 
 
@@ -488,6 +499,7 @@ def _intake_upload(
             upload.filename or "upload.bin",
             settings=settings,
             log_type_override=log_type,
+            expected_bytes=getattr(upload, "size", None),
         )
     except ApiError:
         remove_stored(destination)

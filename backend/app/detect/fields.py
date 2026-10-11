@@ -141,8 +141,15 @@ def _string_or_none(value: Any) -> str | None:
 
 
 def _json_path(field: str) -> str:
-    """``json_extract(fields_json, '$."F"')`` with the key safely escaped."""
-    escaped = field.replace("\\", "\\\\").replace('"', '\\"')
+    """``json_extract(fields_json, '$."F"')`` with the key safely escaped.
+
+    Two contexts have to be satisfied at once: the key is a JSON-path string
+    (so ``\\`` and ``"`` are backslash-escaped) *and* the whole path is a
+    single-quoted SQL literal (so ``'`` is doubled). Escaping only the JSON
+    side would let a field name carrying a single quote break out of the SQL
+    string and inject (spec 10 section 1, S-04).
+    """
+    escaped = field.replace("\\", "\\\\").replace('"', '\\"').replace("'", "''")
     return f"json_extract(fields_json, '$.\"{escaped}\"')"
 
 

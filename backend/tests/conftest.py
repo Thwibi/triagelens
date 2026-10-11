@@ -46,6 +46,10 @@ def settings(data_dir: Path) -> Settings:
         server={"host": "127.0.0.1", "port": 8787},
         storage={"data_dir": str(data_dir)},
         logging={"console": False, "level": "CRITICAL"},
+        # A full shipped-tree sync costs 4-5 s; the suite builds from explicit
+        # settings and starts the full lifespan for many API tests, so it opts
+        # out by default. The rules-catalogue sync tests enable it themselves.
+        detection={"sync_rules_on_startup": False},
     )
 
 

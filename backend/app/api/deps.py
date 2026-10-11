@@ -17,10 +17,16 @@ from fastapi import Request
 
 from app.config import Settings
 from app.db.connection import Database
+from app.db.repositories.alerts import AlertRepository
 from app.db.repositories.allowlist import AllowlistRepository
+from app.db.repositories.audit import AuditRepository
 from app.db.repositories.cases import CaseRepository
+from app.db.repositories.events import EventRepository
 from app.db.repositories.iocs import IocRepository
 from app.db.repositories.jobs import JobRepository
+from app.db.repositories.reports import ReportRepository
+from app.db.repositories.rules import RuleRepository
+from app.db.repositories.runs import DetectionRunRepository
 from app.db.repositories.settings import SettingsRepository
 from app.db.repositories.sources import (
     InventoryRepository,
@@ -70,15 +76,23 @@ def get_writer(request: Request) -> DBWriter:
     return cast(DBWriter, request.app.state.writer)
 
 
-def write_in(request: Request, work: Callable[[sqlite3.Connection], T]) -> T:
+def write_in(
+    request: Request,
+    work: Callable[[sqlite3.Connection], T],
+    *,
+    transactional: bool = True,
+) -> T:
     """Run one unit of write work on the writer thread and return its result.
 
     For synchronous endpoints. ``run`` returns a future, which a ``def`` endpoint
     has no loop to await, so this blocks on the result with a bounded timeout
     rather than hanging the request forever if the writer is wedged.
+
+    ``transactional=False`` runs the work on the writer thread without a
+    surrounding transaction, for statements SQLite forbids inside one (``VACUUM``).
     """
     writer = get_writer(request)
-    return cast(T, writer.run(work).result(timeout=WRITE_TIMEOUT))
+    return cast(T, writer.run(work, transactional=transactional).result(timeout=WRITE_TIMEOUT))
 
 
 def read_connection(request: Request) -> Iterator[sqlite3.Connection]:
@@ -91,6 +105,12 @@ def case_repository(request: Request) -> Iterator[CaseRepository]:
     """A case repository on a read connection closed after the response."""
     with get_database(request).read_connection() as connection:
         yield CaseRepository(connection)
+
+
+def event_repository(request: Request) -> Iterator[EventRepository]:
+    """An event repository on a read connection closed after the response."""
+    with get_database(request).read_connection() as connection:
+        yield EventRepository(connection)
 
 
 def source_repository(request: Request) -> Iterator[SourceRepository]:
@@ -128,9 +148,38 @@ def allowlist_repository(request: Request) -> Iterator[AllowlistRepository]:
         yield AllowlistRepository(connection)
 
 
+def audit_repository(request: Request) -> Iterator[AuditRepository]:
+    with get_database(request).read_connection() as connection:
+        yield AuditRepository(connection)
+
+
+def rule_repository(request: Request) -> Iterator[RuleRepository]:
+    with get_database(request).read_connection() as connection:
+        yield RuleRepository(connection)
+
+
+def alert_repository(request: Request) -> Iterator[AlertRepository]:
+    with get_database(request).read_connection() as connection:
+        yield AlertRepository(connection)
+
+
+def detection_run_repository(request: Request) -> Iterator[DetectionRunRepository]:
+    with get_database(request).read_connection() as connection:
+        yield DetectionRunRepository(connection)
+
+
+def report_repository(request: Request) -> Iterator[ReportRepository]:
+    with get_database(request).read_connection() as connection:
+        yield ReportRepository(connection)
+
+
 __all__ = [
+    "alert_repository",
     "allowlist_repository",
+    "audit_repository",
     "case_repository",
+    "detection_run_repository",
+    "event_repository",
     "get_database",
     "get_job_manager",
     "get_progress",
@@ -141,6 +190,8 @@ __all__ = [
     "job_repository",
     "parse_error_repository",
     "read_connection",
+    "report_repository",
+    "rule_repository",
     "settings_repository",
     "source_repository",
     "write_in",

@@ -178,6 +178,21 @@ class SourceRepository:
         ).fetchone()
         return str(row["stored_path"]) if row else None
 
+    def all_for_hash_check(self) -> list[tuple[str, str, str, str]]:
+        """Every source's ``(id, case_id, stored_path, sha256)`` for verification.
+
+        Used by the maintenance "verify all hashes" action (spec 10 section 5),
+        which recomputes each stored original's digest and compares it with the
+        intake-time value.
+        """
+        rows = self._conn.execute(
+            "SELECT id, case_id, stored_path, sha256 FROM sources ORDER BY case_id, id"
+        ).fetchall()
+        return [
+            (str(row["id"]), str(row["case_id"]), str(row["stored_path"]), str(row["sha256"]))
+            for row in rows
+        ]
+
 
 class ParseErrorRepository:
     """Malformed records recorded during parsing."""

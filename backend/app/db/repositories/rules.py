@@ -27,6 +27,11 @@ _Filter = tuple[list[str], list[object]]
 #: Health buckets for ``GET /rules/health`` and the ``health`` filter.
 #: Precedence keeps the counts summing to the total: a rule that fails to
 #: compile is reported as a compile error even when it is also unroutable.
+#: Rows purged per statement in ``delete_outside``. SQLite's default parameter
+#: cap is far above this, and the shipped sets are a few hundred rows, so both
+#: stays comfortably inside the limit even for a much larger vendored tree.
+_DELETE_BATCH = 400
+
 _HEALTH_SQL: dict[str, str] = {
     "ok": "compile_error IS NULL AND unroutable = 0",
     "compile_error": "compile_error IS NOT NULL",
@@ -110,6 +115,7 @@ class RuleRepository:
         status: str | None = None,
         enabled: bool | None = None,
         tag: str | None = None,
+        technique: str | None = None,
         health: str | None = None,
         q: str | None = None,
         limit: int = 100,
@@ -122,6 +128,7 @@ class RuleRepository:
             status=status,
             enabled=enabled,
             tag=tag,
+            technique=technique,
             health=health,
             q=q,
         )
@@ -141,6 +148,7 @@ class RuleRepository:
         status: str | None = None,
         enabled: bool | None = None,
         tag: str | None = None,
+        technique: str | None = None,
         health: str | None = None,
         q: str | None = None,
     ) -> int:
@@ -151,6 +159,7 @@ class RuleRepository:
             status=status,
             enabled=enabled,
             tag=tag,
+            technique=technique,
             health=health,
             q=q,
         )
@@ -198,6 +207,30 @@ class RuleRepository:
         cursor = self._conn.execute("DELETE FROM rules WHERE id = ?", (rule_id,))
         return cursor.rowcount > 0
 
+    def delete_outside(self, kinds: Sequence[str], keep: set[str]) -> int:
+        """Delete rows of ``kinds`` whose id is not in ``keep``.
+
+        The catalogue sync reconciles the shipped sets against disk, so a rule
+        removed by ``scripts/update_rules.py`` disappears from the catalogue on
+        the next full load. Custom rows are never purged this way: the sync is
+        idempotent by id, and a custom file's absence means it was deleted
+        explicitly, not forgotten.
+        """
+        if not kinds or not keep:
+            return 0
+        kind_slots = ",".join("?" for _ in kinds)
+        deleted = 0
+        ordered = sorted(keep)
+        for start in range(0, len(ordered), _DELETE_BATCH):
+            batch = ordered[start : start + _DELETE_BATCH]
+            slots = ",".join("?" for _ in batch)
+            cursor = self._conn.execute(
+                f"DELETE FROM rules WHERE kind IN ({kind_slots}) AND id NOT IN ({slots})",
+                (*kinds, *batch),
+            )
+            deleted += cursor.rowcount
+        return deleted
+
     def health_counts(self) -> dict[str, int]:
         """Counts per health bucket, summing to the catalogue size."""
         row = self._conn.execute(
@@ -219,6 +252,7 @@ class RuleRepository:
         status: str | None,
         enabled: bool | None,
         tag: str | None,
+        technique: str | None,
         health: str | None,
         q: str | None,
     ) -> _Filter:
@@ -239,6 +273,13 @@ class RuleRepository:
         if tag is not None:
             where.append("EXISTS (SELECT 1 FROM json_each(rules.tags_json) WHERE value = ?)")
             params.append(tag)
+        if technique is not None:
+            where.append(
+                "EXISTS (SELECT 1 FROM json_each(rules.tags_json) "
+                "WHERE lower(value) = ? OR lower(value) LIKE ?)"
+            )
+            tag = f"attack.{technique.lower()}"
+            params.extend((tag, f"{tag}.%"))
         if health is not None:
             if health not in _HEALTH_SQL:
                 raise ValueError(f"unknown rule health filter: {health!r}")

@@ -14,12 +14,15 @@ from app.detect.rules import (
     KIND_BUILTIN,
     KIND_CUSTOM,
     KIND_SIGMA,
+    MAX_YAML_ALIASES,
+    MAX_YAML_BYTES,
     RULE_TYPE_CORRELATION,
     RULE_TYPE_DETECTION,
     LoadedRule,
     LoadProblem,
     load_rules,
     load_rules_from,
+    load_rules_from_text,
 )
 from app.util.hashing import sha256_file
 
@@ -177,8 +180,11 @@ class TestSettingsLoad:
     def test_load_rules_from_settings_finds_the_shipped_rules(self, settings: Settings) -> None:
         rules, problems = load_rules_from(settings)
         assert problems == []
-        assert len(rules) == 16
-        assert {r.kind for r in rules} == {KIND_BUILTIN}
+        builtin = [rule for rule in rules if rule.kind == KIND_BUILTIN]
+        sigma = [rule for rule in rules if rule.kind == KIND_SIGMA]
+        assert len(builtin) == 16
+        assert len(sigma) >= 200
+        assert {rule.kind for rule in rules} == {KIND_BUILTIN, KIND_SIGMA}
 
 
 class TestDocumentSplitting:
@@ -385,6 +391,45 @@ class TestParseAndCompileHealth:
         rules, _ = _load(tmp_path)
         assert rules[0].level == "informational"
         assert rules[0].status == "stable"
+
+
+class TestYamlLimits:
+    """Hostile YAML is refused before pySigma sees it (spec 10 section 1)."""
+
+    def test_an_oversized_document_is_refused(self) -> None:
+        padding = "# " + ("x" * (MAX_YAML_BYTES + 1)) + "\n"
+        rules, problems = load_rules_from_text(DETECTION_DOC + padding)
+        assert rules == []
+        assert len(problems) == 1
+        assert "byte limit" in problems[0].error
+
+    def test_a_document_with_too_many_aliases_is_refused(self) -> None:
+        lines = [
+            "title: Bomb",
+            "id: 11111111-2222-3333-4444-555555555555",
+            "a: &a [1, 2]",
+        ]
+        for index in range(MAX_YAML_ALIASES + 1):
+            lines.append(f"b{index}: *a")
+        lines += [
+            "logsource: { category: webserver }",
+            "detection: { selection: { cs-method: POST }, condition: selection }",
+            "level: low",
+        ]
+        body = "\n".join(lines) + "\n"
+        rules, problems = load_rules_from_text(body)
+        assert rules == []
+        assert len(problems) == 1
+        assert "too many aliases" in problems[0].error
+
+    def test_sigma_wildcards_are_not_mistaken_for_aliases(self) -> None:
+        body = DETECTION_DOC.replace(
+            "    cs-method: POST\n",
+            "    cs-method: '*.exe'\n    user-agent|contains: '*shell*'\n",
+        )
+        rules, problems = load_rules_from_text(body)
+        assert problems == []
+        assert len(rules) == 1
 
 
 def _load_after_change(tmp_path: Path, body: str) -> list[LoadedRule]:

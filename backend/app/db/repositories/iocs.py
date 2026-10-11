@@ -139,8 +139,53 @@ class IocRepository:
                 )
         return written
 
+    def store_alert_iocs(self, case_id: str, groups: list[AggregatedIoc]) -> int:
+        """Upsert alert-scoped (tier-2) indicators without double-counting.
+
+        Unlike :meth:`store`, which assumes each parse batch carries fresh
+        occurrences, the alert-linking stage re-extracts from the same events on
+        every detection run. An occurrence already stored for the same
+        ``(event, field)`` must not inflate ``occurrences`` again, so only the
+        genuinely new occurrence rows advance the denormalized count. Returns
+        the number of indicators that gained at least one new occurrence.
+        """
+        written = 0
+        for group in groups:
+            ioc = group.ioc
+            ioc_id = ioc.ioc_id(case_id)
+            self._conn.execute(
+                _INSERT_OR_UPDATE,
+                (
+                    ioc_id,
+                    case_id,
+                    ioc.type,
+                    ioc.value,
+                    ioc.value_norm,
+                    group.first_seen_ms,
+                    group.last_seen_ms,
+                    0,
+                    group.confidence_score(),
+                    int(ioc.is_private),
+                    int(ioc.is_allowlisted),
+                ),
+            )
+            new = 0
+            for row in group.rows:
+                cursor = self._conn.execute(
+                    _INSERT_OCCURRENCE,
+                    (ioc_id, row.event_id, row.field, row.role, row.decoded_from),
+                )
+                new += cursor.rowcount
+            if new:
+                self._conn.execute(
+                    "UPDATE iocs SET occurrences = occurrences + ? WHERE id = ?",
+                    (new, ioc_id),
+                )
+                written += 1
+        return written
+
     def recompute(self, ioc_ids: list[str]) -> int:
-        """Recount the given indicators from their surviving occurrences.
+        """Recompute counts for the indicators a delete could have changed.
 
         Deletes any that no longer have one. Cheap by construction: the id list
         is exactly the rows that could have changed.

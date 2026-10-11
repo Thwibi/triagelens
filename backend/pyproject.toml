@@ -16,6 +16,9 @@ dependencies = [
     "python-multipart==0.0.32",
     "PyYAML==6.0.3",
     "lxml==6.1.3",
+    # Report rendering (spec 08 section 2): Jinja2 with autoescape=True; the
+    # HTML is then self-contained, and WeasyPrint turns it into PDF when present.
+    "jinja2==3.1.6",
     # The native EVTX reader (pyevtx-rs). The vendored pure-Python fallback in
     # app/ingest/parsers/evtxlib keeps the evtx parser working where this
     # extension cannot load (for example an application-control policy).
@@ -110,6 +113,9 @@ ignore = [
 # S608 fires on INSERT_SQL, which interpolates only the module-level
 # EVENT_COLUMNS tuple. No request or record value ever reaches the SQL text.
 "app/ingest/events.py" = ["S608"]
+# S608 fires on the IN-clause built from one '?' per bound id in the report
+# gatherer; the only interpolated text is the placeholder list.
+"app/reports/*" = ["S608"]
 # PLC0415: local imports break import cycles between config, db and api layers.
 "app/*" = ["PLC0415"]
 # B008: Depends() in a default is the FastAPI idiom for dependency injection.
@@ -153,7 +159,7 @@ namespace_packages = true
 native_parser = false
 
 [[tool.mypy.overrides]]
-module = ["lxml.*", "regex", "yaml", "uvicorn.*"]
+module = ["lxml.*", "regex", "yaml", "uvicorn.*", "weasyprint.*"]
 ignore_missing_imports = true
 
 # ``sigma`` ships py.typed, but pysigma-backend-sqlite does not, so its module
@@ -182,7 +188,10 @@ markers = [
 [tool.coverage.run]
 branch = true
 source = ["app"]
-omit = ["app/static/*"]
+omit = [
+    "app/static/*",
+    "app/ingest/parsers/evtxlib/*",
+]
 
 [tool.coverage.report]
 show_missing = true

@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 
 from app.ingest.detect import detect
+from app.ingest.parsers import evtxlib, windows_evtx
 from app.ingest.parsers.base import ParseContext, load_builtin_parsers
 from app.ingest.parsers.windows_common import map_event_dict
 from app.ingest.parsers.windows_event_xml import WindowsEventXmlParser
@@ -402,3 +403,194 @@ class TestDetectionIntegration:
 def test_native_backend_availability_is_reported() -> None:
     """A diagnostic the status page can show; the value depends on the host."""
     assert isinstance(native_backend_available(), bool)
+
+
+_NATIVE_EVENT = {
+    "Event": {
+        "System": {
+            "Provider": {"#attributes": {"Name": AUDIT}},
+            "EventID": {"#text": "4624", "#attributes": {"Qualifiers": ""}},
+            "Level": "0",
+            "TimeCreated": {"#attributes": {"SystemTime": "2026-03-01T12:00:00Z"}},
+            "EventRecordID": "42",
+            "Channel": SEC,
+            "Computer": "web01",
+        },
+        "EventData": {
+            "Data": [
+                {"#attributes": {"Name": "TargetUserName"}, "#text": "alice"},
+                {"#attributes": {"Name": "IpAddress"}, "#text": "198.51.100.77"},
+            ]
+        },
+    }
+}
+
+
+class TestEvtxNativePath:
+    """The fast path, with a stub standing in for pyevtx-rs (spec 03 section 2).
+
+    The native extension is an optional dependency and absent on many hosts, so
+    the reader is stubbed at the one seam the parser owns. The stub yields what
+    pyevtx-rs yields - JSON strings, dicts, the per-record exception object - and
+    raises where a corrupt chunk stops the reader, exercising the walker and the
+    mapper in full.
+    """
+
+    def _install(self, monkeypatch: pytest.MonkeyPatch, factory: Any) -> None:
+        class _Stub:
+            def __init__(self, path: str) -> None:
+                self.path = path
+
+            def records_json(self) -> Any:
+                return factory()
+
+        monkeypatch.setattr(windows_evtx, "_PyEvtxParser", _Stub)
+
+    def _parse(self, tmp_path: Path) -> tuple[list[Any], list[Any], ParseContext]:
+        # ``backend=None`` selects the native reader because the stub imported.
+        context = context_for(tmp_path / "unused.evtx")
+        events: list[Any] = []
+        failures: list[Any] = []
+        for item in WindowsEvtxParser().parse(context):
+            (failures if hasattr(item, "reason") else events).append(item)
+        return events, failures, context
+
+    def test_a_native_json_record_maps_to_an_event(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._install(monkeypatch, lambda: iter([json.dumps(_NATIVE_EVENT)]))
+        events, failures, _ = self._parse(tmp_path)
+        assert failures == []
+        assert len(events) == 1
+        assert events[0].event_id == 4624
+        assert events[0].record_ref == "42"
+        assert events[0].user_name == "alice"
+        assert events[0].src_ip == "198.51.100.77"
+        assert native_backend_available() is True
+
+    def test_a_dict_record_is_accepted(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._install(monkeypatch, lambda: iter([_NATIVE_EVENT]))
+        events, failures, _ = self._parse(tmp_path)
+        assert failures == []
+        assert len(events) == 1
+
+    def test_a_per_record_exception_becomes_a_failure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._install(monkeypatch, lambda: iter([ValueError("bad record")]))
+        events, failures, context = self._parse(tmp_path)
+        assert events == []
+        assert len(failures) == 1
+        assert "invalid record" in failures[0].reason
+        assert context.counters.errors == 1
+
+    def test_invalid_json_is_a_failure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._install(monkeypatch, lambda: iter(["{not json"]))
+        _, failures, _ = self._parse(tmp_path)
+        assert len(failures) == 1
+        assert "invalid JSON" in failures[0].reason
+
+    def test_a_non_object_record_is_a_failure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._install(monkeypatch, lambda: iter(["[1, 2, 3]"]))
+        _, failures, _ = self._parse(tmp_path)
+        assert len(failures) == 1
+        assert "non-object" in failures[0].reason
+
+    def test_a_mapping_error_is_a_failure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def boom(*args: Any, **kwargs: Any) -> Any:
+            raise ValueError("no such shape")
+
+        monkeypatch.setattr(windows_evtx, "map_event_dict", boom)
+        self._install(monkeypatch, lambda: iter(['{"Event": {}}']))
+        _, failures, _ = self._parse(tmp_path)
+        assert len(failures) == 1
+        assert "could not map event" in failures[0].reason
+
+    def test_the_native_reader_stopping_is_reported(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def factory() -> Any:
+            yield json.dumps(_NATIVE_EVENT)
+            raise RuntimeError("chunk 7 is truncated")
+
+        self._install(monkeypatch, factory)
+        events, failures, _ = self._parse(tmp_path)
+        assert len(events) == 1
+        assert len(failures) == 1
+        assert "reader stopped" in failures[0].reason
+        assert failures[0].record_ref == "record:2"
+
+
+class TestEvtxVendoredFailures:
+    """The error seams of the vendored reader that good fixtures do not reach."""
+
+    def _install_reader(self, monkeypatch: pytest.MonkeyPatch, chunks: list[Any]) -> None:
+        class _Reader:
+            def __enter__(self) -> Any:
+                return self
+
+            def __exit__(self, *exc: Any) -> Literal[False]:
+                return False
+
+            def chunks(self) -> Any:
+                return iter(chunks)
+
+        monkeypatch.setattr(windows_evtx, "_vendored_reader", lambda context: _Reader())
+
+    def test_a_chunk_that_will_not_decode_is_reported(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        class _Chunk:
+            def records(self) -> Any:
+                raise evtxlib.Evtx.ParseException("bad chunk")  # type: ignore[no-untyped-call]
+
+        self._install_reader(monkeypatch, [_Chunk()])
+        context = context_for(tmp_path / "x.evtx")
+        failures = [
+            item
+            for item in WindowsEvtxParser(backend="vendored").parse(context)
+            if hasattr(item, "reason")
+        ]
+        assert len(failures) == 1
+        assert "chunk could not be decoded" in failures[0].reason
+        assert failures[0].record_ref == "chunk:0"
+        assert context.counters.errors == 1
+
+    def test_a_record_that_will_not_map_is_reported(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        class _Record:
+            def lxml(self) -> Any:
+                return object()
+
+            def xml(self) -> str:
+                return "<Event/>"
+
+        class _Chunk:
+            def records(self) -> Any:
+                return iter([_Record()])
+
+        monkeypatch.setattr(windows_evtx, "event_dict_from_element", lambda element: {})
+
+        def boom(*args: Any, **kwargs: Any) -> Any:
+            raise ValueError("no shape")
+
+        monkeypatch.setattr(windows_evtx, "map_event_dict", boom)
+        self._install_reader(monkeypatch, [_Chunk()])
+        failures = [
+            item
+            for item in WindowsEvtxParser(backend="vendored").parse(
+                context_for(tmp_path / "y.evtx")
+            )
+            if hasattr(item, "reason")
+        ]
+        assert len(failures) == 1
+        assert "could not map event" in failures[0].reason

@@ -403,21 +403,67 @@ def make_read_only(root: Path) -> None:
             continue
 
 
-def disk_free_bytes(path: Path) -> int:
-    """Free space on the filesystem holding ``path``.
+#: Incoming bytes are required to fit at least this many times over, so archive
+#: expansion, the WAL and the FTS index cannot fill the disk mid-write (spec 10
+#: section 1, "Disk exhaustion": "need >= 3x file size").
+FILESYSTEM_HEADROOM_FACTOR = 3
 
-    Used before extraction to refuse an archive that cannot fit. ``statvfs`` is
-    not available on Windows, so :func:`shutil.disk_usage` is the portable path.
+
+def ensure_disk_space(
+    path: Path,
+    *,
+    needed_bytes: int = 0,
+    min_free_fraction: float = 0.0,
+) -> None:
+    """Refuse work the filesystem cannot safely hold (spec 10 section 1).
+
+    Two independent checks, both from the disk-exhaustion row of the threat
+    table: the free space must be at least ``needed_bytes *
+    :data:`FILESYSTEM_HEADROOM_FACTOR``` (so a store plus its expansion and WAL
+    still fits), and the free fraction must stay above ``min_free_fraction`` (so
+    the host is never driven to the last few percent, where SQLite and the OS
+    start failing in confusing ways).
+
+    ``path`` must exist, or an ancestor must: the probe walks up to the nearest
+    existing directory, falling back to the working directory. Callers that pass
+    the data directory do not have to create it first.
+
+    Raises:
+        ApiError: ``INSUFFICIENT_STORAGE`` (507), carrying the free and required
+            byte figures so the operator can see why the ingest was refused.
     """
-    return shutil.disk_usage(path).free
+    probe = path
+    while not probe.exists() and probe != probe.parent:
+        probe = probe.parent
+    if not probe.exists():
+        probe = Path.cwd()
+    usage = shutil.disk_usage(probe)
+    free = usage.free
+    required = needed_bytes * FILESYSTEM_HEADROOM_FACTOR
+    if needed_bytes > 0 and free < required:
+        raise ApiError(
+            ErrorCode.INSUFFICIENT_STORAGE,
+            "not enough free disk space to ingest safely",
+            free_bytes=free,
+            required_bytes=required,
+        )
+    floor = int(usage.total * min_free_fraction)
+    if usage.total > 0 and free < floor:
+        raise ApiError(
+            ErrorCode.INSUFFICIENT_STORAGE,
+            "free disk space is below the configured floor",
+            free_bytes=free,
+            required_bytes=floor,
+        )
 
 
 __all__ = [
     "ARCHIVE_SUFFIXES",
+    "FILESYSTEM_HEADROOM_FACTOR",
     "ArchiveLimits",
     "ArchiveResult",
     "ExtractedFile",
-    "disk_free_bytes",
+    "ensure_disk_space",
     "extract_archive",
     "is_archive",
     "make_read_only",

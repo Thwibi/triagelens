@@ -98,6 +98,10 @@ class TestJsonFallback:
         resolved = _generic().resolve('He"llo')
         assert 'He\\"llo' in resolved
 
+    def test_a_single_quote_in_a_field_name_cannot_break_the_sql_literal(self) -> None:
+        resolved = _generic().resolve("a'; DROP TABLE events;--")
+        assert resolved == "json_extract(fields_json, '$.\"a''; DROP TABLE events;--\"')"
+
 
 class TestNumericAndPresence:
     def test_numeric_columns_are_flagged(self) -> None:

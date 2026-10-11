@@ -7,14 +7,18 @@ the same envelope as the spec's paginated endpoints.
 
 from __future__ import annotations
 
+import sqlite3
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import BaseModel, Field
 
-from app.api.deps import case_repository
+from app.api.deps import case_repository, get_settings, write_in
+from app.config import Settings
+from app.db.repositories.audit import AuditRepository
 from app.db.repositories.cases import CaseRepository
 from app.errors import ApiError, ErrorCode
+from app.ingest.intake import remove_stored
 
 router = APIRouter(prefix="/cases", tags=["cases"])
 
@@ -94,13 +98,42 @@ def patch_case(
     return _detail(cases.get(case_id) or record)
 
 
-@router.delete("/{case_id}")
-def delete_case(case_id: str, cases: CaseRepository = Depends(case_repository)) -> dict[str, Any]:
-    """Delete a case and everything under it."""
-    if cases.get(case_id) is None:
+@router.delete("/{case_id}", status_code=204)
+def delete_case(
+    case_id: str,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Delete a case and everything under it (spec 06: cascades; returns 204).
+
+    The DB half runs on the writer thread: a ``case_deleted`` audit row is
+    appended, the chain head is anchored in ``audit_tombstones`` (spec 10 section
+    2), and the case row is deleted, which cascades sources, events, alerts,
+    indicators, reports and jobs. The filesystem half follows only once the
+    transaction has committed: ``data/cases/<id>`` and ``data/reports/<id>`` are
+    removed, overwriting the originals first when ``storage.secure_delete`` is on
+    (spec 02 section 4, spec 10 section 3).
+    """
+    write_in(request, lambda connection: _delete_on_connection(connection, case_id))
+    remove_stored(settings.cases_dir / case_id, secure=settings.storage.secure_delete)
+    remove_stored(settings.reports_dir / case_id, secure=settings.storage.secure_delete)
+    return Response(status_code=204)
+
+
+def _delete_on_connection(connection: sqlite3.Connection, case_id: str) -> None:
+    """Audit, anchor the chain, then delete one case inside the writer transaction."""
+    cases = CaseRepository(connection)
+    record = cases.get(case_id)
+    if record is None:
         raise ApiError(ErrorCode.NOT_FOUND, "case not found", case_id=case_id)
+    audit = AuditRepository(connection)
+    audit.append("case_deleted", case_id=case_id, detail={"name": record.name})
+    audit.write_tombstone(
+        case_id=case_id,
+        last_hash=audit.head(),
+        row_count=audit.count(case_id=case_id),
+    )
     cases.delete(case_id)
-    return {"id": case_id, "deleted": True}
 
 
 def _detail(record: Any) -> dict[str, Any]:

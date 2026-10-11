@@ -1252,3 +1252,88 @@ class TestLinuxIngest:
         assert accepted[0] == "ssh_accepted_login"
         assert accepted[1] == "success"
         assert "user_added" in {row[0] for row in rows}
+
+
+#: Destinations the guard tolerates: the app's own multiprocessing IPC talks
+#: over loopback, which never leaves the machine, so a full run still uses it.
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
+
+
+def _peer_host(address: object) -> str:
+    """The host part of a socket address, however it was spelled."""
+    if isinstance(address, tuple) and address:
+        return str(address[0])
+    if isinstance(address, bytes):
+        return address.decode("utf-8", "replace")
+    return str(address)
+
+
+class TestNoOutboundConnects:
+    """S-05: a full ingest to report run opens no outbound socket (spec 10 1).
+
+    The guard patches the three ways Python opens a connection and lets only
+    loopback through. Every external attempt is recorded and raised, so a run
+    that completes proves the enrichment-off policy held end to end: an upload
+    (real worker process), a detection pass and a report render.
+    """
+
+    def _install(self, monkeypatch: pytest.MonkeyPatch) -> list[str]:
+        attempts: list[str] = []
+        real_connect = socket.socket.connect
+        real_connect_ex = socket.socket.connect_ex
+        real_create = socket.create_connection
+
+        def guarded_connect(sock: Any, address: Any, *args: Any, **kwargs: Any) -> Any:
+            host = _peer_host(address)
+            if host not in _LOOPBACK_HOSTS:
+                attempts.append(host)
+                raise AssertionError(f"outbound connect attempted: {host}")
+            return real_connect(sock, address, *args, **kwargs)
+
+        def guarded_connect_ex(sock: Any, address: Any, *args: Any, **kwargs: Any) -> Any:
+            host = _peer_host(address)
+            if host not in _LOOPBACK_HOSTS:
+                attempts.append(host)
+                raise AssertionError(f"outbound connect_ex attempted: {host}")
+            return real_connect_ex(sock, address, *args, **kwargs)
+
+        def guarded_create(address: Any, *args: Any, **kwargs: Any) -> Any:
+            host = _peer_host(address)
+            if host not in _LOOPBACK_HOSTS:
+                attempts.append(host)
+                raise AssertionError(f"outbound create_connection attempted: {host}")
+            return real_create(address, *args, **kwargs)
+
+        monkeypatch.setattr(socket.socket, "connect", guarded_connect)
+        monkeypatch.setattr(socket.socket, "connect_ex", guarded_connect_ex)
+        monkeypatch.setattr(socket, "create_connection", guarded_create)
+        return attempts
+
+    def test_the_guard_fires_on_an_external_destination(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        attempts = self._install(monkeypatch)
+        with pytest.raises(AssertionError):
+            socket.create_connection(("93.184.216.34", 80), timeout=0.05)
+        assert attempts == ["93.184.216.34"]
+
+    def test_a_full_run_performs_zero_outbound_connects(
+        self, client: TestClient, case_id: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        attempts = self._install(monkeypatch)
+
+        body = upload(client, case_id, ("access.ndjson", ecs_lines(5).encode()))
+        assert wait_for_job(client, body["jobs"][0]["id"], expect="done")["status"] == "done"
+        assert client.get(f"/api/cases/{case_id}/events/count").json()["count"] == 5
+
+        detect = client.post(f"/api/cases/{case_id}/detect", json={"profile": "full"})
+        assert detect.status_code == 202, detect.text
+        assert wait_for_job(client, detect.json()["id"], expect="done")["status"] == "done"
+
+        report = client.post(
+            f"/api/cases/{case_id}/reports", json={"title": "S-05", "format": "md"}
+        )
+        assert report.status_code == 202, report.text
+        assert wait_for_job(client, report.json()["id"], expect="done")["status"] == "done"
+
+        assert attempts == []

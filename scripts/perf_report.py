@@ -141,15 +141,18 @@ def render(measurements: Sequence[dict[str, Any]], generated: str) -> str:
 
     lines += [
         "",
-        "## Targets not yet measurable",
+        "## Spec 09 section 8 targets not covered by this harness",
         "",
-        "The spec 09 section 8 targets below exercise the ingest and detection",
-        "pipeline, which is built in later phases. They are absent here rather than",
-        "estimated; see `docs/DECISIONS.md` for the phase each one waits on.",
+        "This harness measures storage, parsing, IOC and health primitives. The",
+        "spec 09 section 8 end-to-end targets (multi-worker ingest throughput, a",
+        "1M-event detection run within 5 minutes at \u2264 2 GB RSS, 5M-event API and FTS",
+        "p95 latency, UI first paint, and a 10 GB ingest within 1.5 GB RSS) are not",
+        "measured here and are recorded as not-run in `docs/DECISIONS.md` and",
+        "`docs/COMPLIANCE.md` rather than estimated.",
         "",
-        "Note also that the numbers above were recorded on the platform in the Device",
-        "table, which is not the spec's reference laptop (8 cores, 16 GB, NVMe). Treat",
-        "them as a baseline for regression detection, not as a target verdict.",
+        "The numbers above were recorded on the platform in the Device table, which is",
+        "not the spec's reference laptop (8 cores, 16 GB, NVMe). Treat them as a",
+        "baseline for regression detection, not as a target verdict.",
         "",
     ]
     return "\n".join(lines) + "\n"

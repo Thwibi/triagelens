@@ -42,12 +42,17 @@ from app.config import Settings, load_settings
 from app.db.connection import Database, SqliteCapabilityError, SqliteTooNewError
 from app.db.migrations import apply_migrations
 from app.db.repositories.audit import AuditRepository
+from app.db.repositories.rules import RuleRepository
+from app.detect.sync import sync_catalogue
 from app.errors import ApiError, ErrorCode
+from app.jobs.detect import DetectRunner
 from app.jobs.manager import JobManager
 from app.jobs.progress import ProgressBus
+from app.jobs.report import ReportRunner
 from app.jobs.tasks import IngestRunner
 from app.jobs.writer import DBWriter
 from app.models.job import JobKind
+from app.models.rule import KIND_BUILTIN, KIND_SIGMA
 from app.util.logging import configure_logging, get_logger
 from app.version import APP_NAME, APP_VERSION
 
@@ -151,6 +156,36 @@ def _register_exception_handlers(app: FastAPI) -> None:
         return _error_response(ApiError(ErrorCode.INTERNAL, "internal server error"))
 
 
+def _sync_startup_rules(database: Database, settings: Settings) -> None:
+    """Seed the shipped rule tree into the catalogue on first run.
+
+    A fresh install starts with an empty ``rules`` table, so detection has
+    nothing to run until an operator imports rules. This loads the shipped
+    builtin and sigma trees once and upserts them into the catalogue (spec 04
+    section 1). The gate makes every later boot cheap: once shipped rows exist
+    they only change through the operator's own files or a deliberate
+    ``POST /rules/import``, so the 4-5 s tree load is skipped entirely.
+    Existing ``enabled`` choices survive because upserts never touch that flag.
+    """
+    repository = RuleRepository(database.writer)
+    existing = repository.count(kind=KIND_BUILTIN) + repository.count(kind=KIND_SIGMA)
+    if existing > 0:
+        return
+    report = sync_catalogue(database.writer, settings=settings)
+    logger.info(
+        "rule catalogue seeded",
+        extra={
+            "rules": report.total,
+            "upserted": report.upserted,
+            "stale_removed": report.stale_removed,
+            "load_problems": len(report.problems),
+            "kinds": report.kinds,
+        },
+    )
+    for problem in report.problems:
+        logger.warning("rule skipped", extra={"where": problem.where, "error": problem.error})
+
+
 def _startup(settings: Settings) -> Database:
     """Verify SQLite, open the database and bring the schema up to date."""
     database = Database(settings.db_path)
@@ -170,6 +205,8 @@ def _startup(settings: Settings) -> Database:
             "migrations_applied": applied,
         },
     )
+    if settings.detection.sync_rules_on_startup:
+        _sync_startup_rules(database, settings)
     return database
 
 
@@ -193,6 +230,14 @@ def _build_ingest(
         max_line_bytes=settings.limits.max_line_bytes,
     )
     manager.register_handler(str(JobKind.INGEST), runner, on_cancel=runner.cancel)
+    detect = DetectRunner(
+        writer=writer,
+        progress=progress,
+        settings=settings,
+    )
+    manager.register_handler(str(JobKind.DETECT), detect, on_cancel=detect.cancel)
+    report = ReportRunner(writer=writer, progress=progress, settings=settings)
+    manager.register_handler(str(JobKind.REPORT), report)
     return runner
 
 

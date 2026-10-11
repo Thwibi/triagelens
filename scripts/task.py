@@ -212,6 +212,44 @@ def task_frontend_lint() -> int:
     return _run([_npm(), "run", "lint"], cwd=FRONTEND)
 
 
+def task_openapi() -> int:
+    """Regenerate the committed OpenAPI document and the frontend types.
+
+    The document is written by Python (it inspects the FastAPI app) and the
+    TypeScript types are derived from it by ``openapi-typescript``. Run this
+    after changing any request model so the frontend sees the new shape.
+    """
+    code = _run(
+        [str(venv_python()), str(ROOT / "scripts" / "export_openapi.py")], cwd=ROOT
+    )
+    if code:
+        return code
+    return _run([_npm(), "run", "gen:api"], cwd=FRONTEND)
+
+
+def task_openapi_check() -> int:
+    """Fail when the committed OpenAPI document or generated types have drifted.
+
+    Regenerates both into place and asks git whether anything changed, so a
+    stale artifact is caught before it is merged rather than after a consuming
+    screen breaks.
+    """
+    code = task_openapi()
+    if code:
+        return code
+    return _run(
+        [
+            "git",
+            "diff",
+            "--exit-code",
+            "--",
+            "frontend/src/api/openapi.json",
+            "frontend/src/api/openapi.d.ts",
+        ],
+        cwd=ROOT,
+    )
+
+
 def task_frontend_typecheck() -> int:
     """TypeScript in no-emit mode."""
     return _run([_npm(), "run", "typecheck"], cwd=FRONTEND)
@@ -285,7 +323,13 @@ def task_build() -> int:
 
 def task_all() -> int:
     """Every quality gate: lint, typecheck, test and lockfile freshness."""
-    for step in (task_lint, task_typecheck, task_test, task_lock_check):
+    for step in (
+        task_lint,
+        task_typecheck,
+        task_test,
+        task_lock_check,
+        task_openapi_check,
+    ):
         code = step()
         if code:
             _log(f"{step.__name__} failed with exit code {code}")
@@ -344,6 +388,8 @@ TASKS: dict[str, Callable[[], int]] = {
     "frontend-typecheck": task_frontend_typecheck,
     "frontend-test": task_frontend_test,
     "frontend-build": task_frontend_build,
+    "openapi": task_openapi,
+    "openapi-check": task_openapi_check,
     "dev": task_dev,
     "lint": task_lint,
     "typecheck": task_typecheck,

@@ -26,6 +26,7 @@ from typing import Any
 import yaml
 from sigma.correlations import SigmaCorrelationRule
 from sigma.rule import SigmaRule
+from yaml.events import AliasEvent
 
 from app.config import Settings
 from app.detect.compile import CompileError, compile_detection
@@ -51,6 +52,35 @@ _LEVELS = frozenset({"informational", "low", "medium", "high", "critical"})
 #: Used when a rule ships without a Sigma ``id``: stable for a given document,
 #: so reloading the same file never mints a second catalogue row.
 _GENERATED_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL, "https://triagelens.local/rule")
+
+#: Hostile-input bounds for rule YAML (spec 10 section 1, "YAML attacks"). A
+#: document larger than this, or one carrying too many aliases (a "billion
+#: laughs" expansion bomb), is refused while parsing. ``SafeLoader`` already
+#: rejects custom tags.
+MAX_YAML_BYTES = 1_000_000
+MAX_YAML_ALIASES = 50
+
+
+class _AliasLimitedSafeLoader(yaml.SafeLoader):
+    """``safe_load`` with a hard cap on alias events (spec 10 section 1).
+
+    Counting real alias nodes - rather than scanning the text - means Sigma
+    wildcards inside values (``'*shell*'``, ``selection*``) are never
+    mistaken for aliases.
+    """
+
+    def __init__(self, stream: Any) -> None:
+        super().__init__(stream)
+        self._alias_count = 0
+
+    def compose_node(self, parent: Any, index: Any) -> Any:
+        if self.check_event(AliasEvent):
+            self._alias_count += 1
+            if self._alias_count > MAX_YAML_ALIASES:
+                raise yaml.YAMLError(
+                    f"YAML document has too many aliases (limit {MAX_YAML_ALIASES})"
+                )
+        return super().compose_node(parent, index)
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,6 +161,56 @@ def load_rules_from(settings: Settings) -> tuple[list[LoadedRule], list[LoadProb
     )
 
 
+def load_rules_from_text(
+    text: str,
+    *,
+    kind: str = KIND_CUSTOM,
+    source: str = "custom",
+    logsource_map: Path | None = None,
+) -> tuple[list[LoadedRule], list[LoadProblem]]:
+    """Load every YAML document from one string (the rules API).
+
+    Multi-document input yields one rule per document, mirroring file loads:
+    the whole text's digest is the ``sha256`` and the document index becomes
+    part of ``file_path`` when there is more than one document.
+    """
+    table = load_logsource_map(logsource_map or _SHIPPED_MAP)
+    raw = text.encode("utf-8")
+    digest = sha256_bytes(raw)
+    try:
+        documents = _load_documents(text)
+    except yaml.YAMLError as exc:
+        return [], [LoadProblem(source, f"invalid YAML: {exc}")]
+
+    problems: list[LoadProblem] = []
+    loaded: list[LoadedRule] = []
+    path = Path(source)
+    multiple = sum(1 for document in documents if document is not None) > 1
+    for position, document in enumerate(documents, start=1):
+        if document is None:
+            continue  # trailing separator or an empty slot
+        where = f"{source}#{position}" if multiple else source
+        if not isinstance(document, dict):
+            problems.append(LoadProblem(where, "document is not a mapping"))
+            continue
+        if "filter" in document:
+            continue  # pySigma correlation filter; the engine reads it from yaml
+        loaded.append(
+            _load_document(
+                kind,
+                path,
+                position=position,
+                document=document,
+                digest=digest,
+                table=table,
+                problems=problems,
+                where=where,
+                multiple=multiple,
+            )
+        )
+    return loaded, problems
+
+
 def _rule_files(directory: Path, *, recursive: bool) -> list[Path]:
     """Rule files under ``directory``, sorted so loads are reproducible."""
     if not directory.is_dir():
@@ -156,7 +236,7 @@ def _load_file(
         return []
     digest = sha256_bytes(raw)
     try:
-        documents = list(yaml.safe_load_all(_decode(raw)))
+        documents = _load_documents(_decode(raw))
     except yaml.YAMLError as exc:
         problems.append(LoadProblem(str(path), f"invalid YAML: {exc}"))
         return []
@@ -260,6 +340,18 @@ def _without_generate(document: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(block, dict) or "generate" not in block:
         return document
     return {**document, "correlation": {k: v for k, v in block.items() if k != "generate"}}
+
+
+def _load_documents(text: str) -> list[Any]:
+    """Parse every YAML document, refusing oversized or alias-bomb input.
+
+    Raises :class:`yaml.YAMLError` for input over :data:`MAX_YAML_BYTES`, for a
+    document with more than :data:`MAX_YAML_ALIASES` aliases, or for invalid
+    YAML (spec 10 section 1).
+    """
+    if len(text.encode("utf-8")) > MAX_YAML_BYTES:
+        raise yaml.YAMLError(f"YAML document exceeds the {MAX_YAML_BYTES} byte limit")
+    return list(yaml.load_all(text, Loader=_AliasLimitedSafeLoader))
 
 
 def _decode(raw: bytes) -> str:
@@ -394,4 +486,5 @@ __all__ = [
     "LoadedRule",
     "load_rules",
     "load_rules_from",
+    "load_rules_from_text",
 ]

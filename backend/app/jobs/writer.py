@@ -133,15 +133,24 @@ class DBWriter:
         """
         return await asyncio.to_thread(self.flush, timeout)
 
-    def run(self, work: Callable[[sqlite3.Connection], Any]) -> Future[Any]:
+    def run(
+        self,
+        work: Callable[[sqlite3.Connection], Any],
+        *,
+        transactional: bool = True,
+    ) -> Future[Any]:
         """Run ``work(connection)`` on the writer thread inside a transaction.
 
         Returns a future carrying the work's return value, or the exception it
         raised. Every write in the process goes through here or through
         :meth:`submit`, which is what makes the single-writer rule true rather
         than merely intended.
+
+        ``transactional=False`` runs the work with no surrounding transaction on
+        the writer thread. It exists for statements SQLite forbids inside a
+        transaction (``VACUUM``); the work must then manage its own atomicity.
         """
-        call = _Call(work=work)
+        call = _Call(work=work, transactional=transactional)
         self._queue.put(call)
         return call.future
 
@@ -185,8 +194,13 @@ class DBWriter:
     def _call(self, call: _Call) -> None:
         """Run one piece of work on this thread and hand back what it produced."""
         try:
-            with self._database.transaction() as connection:
-                result = call.work(connection)
+            if call.transactional:
+                with self._database.transaction() as connection:
+                    result = call.work(connection)
+            else:
+                # Statements SQLite forbids inside a transaction (VACUUM) run on
+                # the bare writer connection; the work owns its own atomicity.
+                result = call.work(self._database.writer)
         except BaseException as error:
             # The error travels back through the future rather than only being
             # logged: the caller asked for this work and can act on it.

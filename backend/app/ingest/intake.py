@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import os
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -29,6 +30,7 @@ from app.errors import ApiError, ErrorCode
 from app.ingest.archive import (
     ArchiveLimits,
     ArchiveResult,
+    ensure_disk_space,
     extract_archive,
     is_archive,
     make_read_only,
@@ -225,6 +227,7 @@ def intake_stream(
     settings: Settings,
     log_type_override: str | None = None,
     expand_archives: bool = True,
+    expected_bytes: int | None = None,
 ) -> IntakeResult:
     """Store an upload, expand it if it is an archive, and detect every file.
 
@@ -235,15 +238,27 @@ def intake_stream(
         settings: Supplies the size limits and detection configuration.
         log_type_override: A format the operator chose, which skips detection.
         expand_archives: Set false to store an archive without expanding it.
+        expected_bytes: The caller's best estimate of the incoming size (a
+            declared content length or a file's on-disk size), used only for the
+            spec 10 disk-headroom check. ``None`` applies the free-fraction floor
+            alone.
 
     Returns:
         The stored file, its detection result, and any extracted files.
 
     Raises:
         ApiError: ``UPLOAD_TOO_LARGE``, ``UNSUPPORTED_FORMAT``,
-            ``ARCHIVE_LIMIT_EXCEEDED`` or ``FORBIDDEN_PATH``.
+            ``ARCHIVE_LIMIT_EXCEEDED``, ``INSUFFICIENT_STORAGE`` or
+            ``FORBIDDEN_PATH``.
     """
     limits = settings.limits
+    # Refuse before a single byte is written when the filesystem cannot hold the
+    # upload and its expansion (spec 10 section 1, "Disk exhaustion").
+    ensure_disk_space(
+        settings.data_dir,
+        needed_bytes=expected_bytes or 0,
+        min_free_fraction=limits.min_free_disk_fraction,
+    )
     stored = store_stream(stream, destination_dir, filename, max_bytes=limits.max_upload_bytes)
 
     archive_result: ArchiveResult | None = None
@@ -306,6 +321,7 @@ def intake_path(
             settings=settings,
             log_type_override=log_type_override,
             expand_archives=expand_archives,
+            expected_bytes=path.stat().st_size,
         )
     finally:
         # The handle is closed here, never in the caller: the import path gets
@@ -314,22 +330,56 @@ def intake_path(
         handle.close()
 
 
-def remove_stored(destination_dir: Path) -> None:
+def remove_stored(destination_dir: Path, *, secure: bool = False) -> None:
     """Delete everything intake wrote for one source.
 
     Stored files are read-only, and Windows refuses to delete a read-only file,
     so the write bits are restored first. Deletion is best-effort per entry: one
     file held open by another process must not leave the rest of the tree behind.
+
+    With ``secure`` set (``storage.secure_delete``, spec 10 section 3) each
+    regular file is overwritten with zeros once before it is unlinked, so the
+    evidence bytes no longer sit in a freed block. This is best effort: SSD wear
+    levelling and copy-on-write filesystems can leave the old bytes elsewhere,
+    which is why the spec documents it as not guaranteed.
     """
     if not destination_dir.exists():
         return
     for path in sorted(destination_dir.rglob("*"), reverse=True):
         with contextlib.suppress(OSError):
             path.chmod(_WRITABLE_MODE)
+        if secure and path.is_file():
+            _overwrite_once(path)
         with contextlib.suppress(OSError):
             path.unlink() if path.is_file() else path.rmdir()
+    # The directory itself was made read-only by ``make_read_only``; Windows
+    # refuses to remove a read-only directory, so restore its write bit too.
+    with contextlib.suppress(OSError):
+        destination_dir.chmod(_WRITABLE_MODE)
     with contextlib.suppress(OSError):
         destination_dir.rmdir()
+
+
+def _overwrite_once(path: Path) -> None:
+    """Overwrite a file in place with zeros, then flush it to disk.
+
+    Failure is not fatal: a read-only or held-open file is left for the unlink
+    below rather than aborting the whole delete.
+    """
+    try:
+        size = path.stat().st_size
+        if size == 0:
+            return
+        with path.open("r+b") as handle:
+            remaining = size
+            while remaining > 0:
+                chunk = min(remaining, CHUNK_BYTES)
+                handle.write(b"\x00" * chunk)
+                remaining -= chunk
+            handle.flush()
+            os.fsync(handle.fileno())
+    except OSError:
+        return
 
 
 #: Mode restored on stored files so they can be deleted again.
