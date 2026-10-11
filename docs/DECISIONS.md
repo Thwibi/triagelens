@@ -3,6 +3,26 @@
 Each entry records a decision that is not obvious from the code, why it was
 made, and what it costs. Newest first. Dates are ISO-8601.
 
+## 2026-10-11 — pip-audit: accepted risk for the diskcache advisory
+
+**Decision.** `pip-audit -r backend/requirements.lock` reports one advisory in a
+transitive dependency, `diskcache` 5.6.3 (PYSEC-2026-2447 / CVE-2025-69872, a
+pickle-deserialization issue reachable only by an attacker who can already write
+to the cache directory). It is accepted, and the CI `dependency-audit` job
+carries an explicit `--ignore-vuln PYSEC-2026-2447`, rather than being fixed or
+left to fail the build.
+
+**Why.** There is no fix to take: 5.6.3 is the latest release and the advisory
+lists no fixed version. The dependency is not ours — it arrives via
+`pySigma==1.5.1` — and its only use in pySigma is the on-disk cache in
+`sigma.data.mitre_attack` / `sigma.data.mitre_d3fend`, which the application
+never imports (ATT&CK data is loaded through `POST /settings/attack/import`).
+The vulnerable `pickle.load` path is therefore not reachable from any request.
+
+**Cost.** A standing ignore is easy to forget. It is scoped to the single
+advisory id, recorded in `docs/COMPLIANCE.md`, and must be revisited when a
+fixed `diskcache` (or a pySigma release that drops it) appears.
+
 ## 2026-10-11 — Accessibility gate (axe-core) and the AA text tokens
 
 **Decision.** The spec 07 "Lighthouse accessibility = 95" clause is realised as an

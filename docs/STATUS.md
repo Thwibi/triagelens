@@ -52,7 +52,7 @@ environment are in `docs/COMPLIANCE.md`; the open gaps are listed below.
 | Browser E2E | `python scripts\task.py e2e` (builds the app, then Playwright) | 5 passed — Scenarios A/B/C + the S-02 XSS render check (spec 09 §7) + the axe-core a11y scan of the 13 main screens; Chromium headless |
 | Bundle budget | `python scripts\task.py frontend-budget` (after a build) | 693 KB gzipped vs the 1.5 MB spec 07 budget (PASS) |
 | Benchmarks | `.venv\Scripts\python.exe scripts\task.py perf` | 15 primitive benchmarks, refreshed `docs/perf-results.md` |
-| Audits | `npm audit --audit-level=high` (in `frontend/`) | 0 vulnerabilities; `pip-audit` is wired into `.github/workflows/ci.yml` but not run here (not installed) |
+| Audits | `npm audit --audit-level=high` (in `frontend/`); `pip-audit -r backend/requirements.lock` | npm: 0 vulnerabilities; pip-audit: only the accepted `diskcache` advisory (diskcache 5.6.3, PYSEC-2026-2447; no fix, unreachable — see DECISIONS), otherwise clean |
 | CI | `.github/workflows/ci.yml` | backend lint/typecheck/coverage, frontend lint/typecheck/test/`npm audit`/bundle budget, a `pip-audit` job, and a browser `e2e` job; not yet executed on a runner |
 
 ### Known limitations

@@ -178,7 +178,7 @@ No literal "MUST" tokens; normative. Covered by `test_reports.py`,
 | Requirement | Code | Test | Status |
 |---|---|---|---|
 | Lockfiles with hashes (`requirements.lock`, `package-lock.json`) | `backend/requirements.lock`, `frontend/package-lock.json` | `scripts/gen_lock.py`, `verify_lock.py`, `task.py lock-check` | Covered |
-| `pip-audit` and `npm audit` in CI; fail on high/critical | `.github/workflows/ci.yml` (frontend job `npm audit --audit-level=high`; `dependency-audit` job `pip-audit -r backend/requirements.lock`) | the workflow itself; local `npm audit` here: 0 vulnerabilities | Covered |
+| `pip-audit` and `npm audit` in CI; fail on high/critical | `.github/workflows/ci.yml` (frontend job `npm audit --audit-level=high`; `dependency-audit` job `pip-audit -r backend/requirements.lock --ignore-vuln PYSEC-2026-2447`) | the workflow itself; local `npm audit`: 0 vulnerabilities; local `pip-audit`: only the accepted `diskcache` advisory (unreachable, see "Accepted dependency risk") | Covered |
 | Vendored rule/data provenance in `SOURCES.md`; licences in `THIRD_PARTY_NOTICES.md` and shown in the UI About dialog | `SOURCES.md`, `THIRD_PARTY_NOTICES.md`, `backend/rules/sigma/UPSTREAM-LICENSE.md`, `AboutDialog.tsx` (bundles `THIRD_PARTY_NOTICES.md?raw` into a collapsible panel) | `SettingsPage.test.tsx` (About dialog shows "Detection Rule License (DRL) 1.1" and "MITRE ATT&CK") | Covered |
 
 ## Gaps and open risks
@@ -202,6 +202,21 @@ remaining work.
    reference-laptop verdict is therefore unproven; the numbers are a regression
    baseline only.
 
+## Accepted dependency risk
+
+`pip-audit` against `backend/requirements.lock` reports one advisory in a
+transitive dependency: **PYSEC-2026-2447 / CVE-2025-69872** in `diskcache` 5.6.3
+(unsafe pickle deserialization; an attacker who can already write to the cache
+directory can achieve code execution when it is read). It is accepted rather than
+fixed because there is no fixed release — 5.6.3 is the latest — and because it is
+not reachable here: `diskcache` is pulled in by `pySigma==1.5.1` and used only by
+`sigma.data.mitre_attack` / `sigma.data.mitre_d3fend`, the modules that cache the
+upstream ATT&CK/D3FEND downloads; the application loads its ATT&CK data through
+`POST /settings/attack/import` and never imports those modules. The CI
+`dependency-audit` job therefore pins the ignore (`--ignore-vuln
+PYSEC-2026-2447`) with this rationale, to be revisited when a fixed `diskcache`
+(or a pySigma that drops it) is released. See `docs/DECISIONS.md`.
+
 ## Re-running the verification
 
 ```bash
@@ -214,9 +229,10 @@ python scripts/task.py scripts-lint
 cd frontend && npx --no-install vitest --run
 ```
 
-Post-audit commands that need network or new tools (not run in this environment):
+Post-audit commands that need network or a new tool:
 
 ```bash
-python -m pip install pip-audit && pip-audit -r backend/requirements.lock
+python -m pip install pip-audit
+python -m pip_audit -r backend/requirements.lock --disable-pip  # audits the pinned set without a platform wheel
 cd frontend && npm audit --audit-level=high
 ```

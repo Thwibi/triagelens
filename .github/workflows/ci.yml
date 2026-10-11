@@ -76,7 +76,12 @@ jobs:
       - name: Install pip-audit
         run: python -m pip install pip-audit
       - name: Audit the pinned runtime dependencies
-        run: pip-audit -r backend/requirements.lock
+        # PYSEC-2026-2447 (diskcache <= 5.6.3, CVE-2025-69872): transitive via
+        # pySigma==1.5.1, no fixed release exists (5.6.3 is the latest), and the
+        # only diskcache-backed modules (sigma.data.mitre_attack / mitre_d3fend)
+        # are never imported by the app, so the path is unreachable. See
+        # docs/DECISIONS.md.
+        run: pip-audit -r backend/requirements.lock --ignore-vuln PYSEC-2026-2447
 
   e2e:
     runs-on: ubuntu-latest
