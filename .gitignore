@@ -17,6 +17,11 @@ node_modules/
 frontend/node_modules/
 .vite/
 
+# Playwright browser E2E artefacts
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+
 # Build output: generated from frontend/src by `make frontend-build`
 backend/app/static/
 
