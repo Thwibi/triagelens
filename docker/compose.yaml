@@ -1,7 +1,7 @@
 # Compose file for a local production-like run.
 #
 #   scripts/compose.sh up --build       start on 127.0.0.1:8787
-#   scripts/compose.sh --profile pdf up include the optional PDF renderer
+#   scripts/compose.sh --profile pdf up add WeasyPrint's system libraries
 #
 # The wrapper generates TRIAGELENS_TOKEN into docker/.env on first use, so the
 # token stays stable across restarts without being exported by hand.
