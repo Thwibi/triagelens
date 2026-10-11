@@ -9,7 +9,7 @@ TASK := $(PYTHON) scripts/task.py
 .DEFAULT_GOAL := help
 .PHONY: help install backend-install frontend-install lint typecheck test build all \
         backend-lint backend-format backend-typecheck backend-test backend-coverage \
-        frontend-lint frontend-typecheck frontend-test frontend-build \
+        frontend-lint frontend-typecheck frontend-test frontend-build e2e \
         backend-lock lock-check scripts-lint dev backend-run docker-build clean
 
 help: ## Show this help
@@ -81,6 +81,9 @@ frontend-test: ## Test the frontend
 
 frontend-build: ## Build the frontend into backend/app/static
 	$(TASK) frontend-build
+
+e2e: ## Build the app and run the browser E2E suite (Playwright)
+	$(TASK) e2e
 
 dev: ## Run the Vite dev server with the API proxied
 	$(TASK) dev

@@ -1,0 +1,399 @@
+{
+  "type": "bundle",
+  "id": "bundle--triagelens-e2e-0001",
+  "x_mitre_version": "16.1.0",
+  "objects": [
+    {
+      "type": "x-mitre-tactic",
+      "id": "x-mitre-tactic--e2e-reconnaissance",
+      "name": "Reconnaissance",
+      "x_mitre_shortname": "reconnaissance",
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "TA0043", "url": "https://attack.mitre.org/tactics/TA0043"}
+      ]
+    },
+    {
+      "type": "x-mitre-tactic",
+      "id": "x-mitre-tactic--e2e-initial-access",
+      "name": "Initial Access",
+      "x_mitre_shortname": "initial-access",
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "TA0001", "url": "https://attack.mitre.org/tactics/TA0001"}
+      ]
+    },
+    {
+      "type": "x-mitre-tactic",
+      "id": "x-mitre-tactic--e2e-execution",
+      "name": "Execution",
+      "x_mitre_shortname": "execution",
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "TA0002", "url": "https://attack.mitre.org/tactics/TA0002"}
+      ]
+    },
+    {
+      "type": "x-mitre-tactic",
+      "id": "x-mitre-tactic--e2e-persistence",
+      "name": "Persistence",
+      "x_mitre_shortname": "persistence",
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "TA0003", "url": "https://attack.mitre.org/tactics/TA0003"}
+      ]
+    },
+    {
+      "type": "x-mitre-tactic",
+      "id": "x-mitre-tactic--e2e-privilege-escalation",
+      "name": "Privilege Escalation",
+      "x_mitre_shortname": "privilege-escalation",
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "TA0004", "url": "https://attack.mitre.org/tactics/TA0004"}
+      ]
+    },
+    {
+      "type": "x-mitre-tactic",
+      "id": "x-mitre-tactic--e2e-defense-evasion",
+      "name": "Defense Evasion",
+      "x_mitre_shortname": "defense-evasion",
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "TA0005", "url": "https://attack.mitre.org/tactics/TA0005"}
+      ]
+    },
+    {
+      "type": "x-mitre-tactic",
+      "id": "x-mitre-tactic--e2e-credential-access",
+      "name": "Credential Access",
+      "x_mitre_shortname": "credential-access",
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "TA0006", "url": "https://attack.mitre.org/tactics/TA0006"}
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1059",
+      "name": "Command and Scripting Interpreter",
+      "x_mitre_is_subtechnique": false,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "execution"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1059", "url": "https://attack.mitre.org/techniques/T1059"}
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1059-001",
+      "name": "PowerShell",
+      "x_mitre_is_subtechnique": true,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "execution"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1059.001", "url": "https://attack.mitre.org/techniques/T1059/001"}
+      ]
+    },
+    {
+      "type": "relationship",
+      "id": "relationship--e2e-1",
+      "relationship_type": "subtechnique-of",
+      "source_ref": "attack-pattern--e2e-t1059-001",
+      "target_ref": "attack-pattern--e2e-t1059"
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1110",
+      "name": "Brute Force",
+      "x_mitre_is_subtechnique": false,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "credential-access"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1110", "url": "https://attack.mitre.org/techniques/T1110"}
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1110-001",
+      "name": "Password Guessing",
+      "x_mitre_is_subtechnique": true,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "credential-access"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1110.001", "url": "https://attack.mitre.org/techniques/T1110/001"}
+      ]
+    },
+    {
+      "type": "relationship",
+      "id": "relationship--e2e-2",
+      "relationship_type": "subtechnique-of",
+      "source_ref": "attack-pattern--e2e-t1110-001",
+      "target_ref": "attack-pattern--e2e-t1110"
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1110-003",
+      "name": "Password Spraying",
+      "x_mitre_is_subtechnique": true,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "credential-access"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1110.003", "url": "https://attack.mitre.org/techniques/T1110/003"}
+      ]
+    },
+    {
+      "type": "relationship",
+      "id": "relationship--e2e-3",
+      "relationship_type": "subtechnique-of",
+      "source_ref": "attack-pattern--e2e-t1110-003",
+      "target_ref": "attack-pattern--e2e-t1110"
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1070",
+      "name": "Indicator Removal",
+      "x_mitre_is_subtechnique": false,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "defense-evasion"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1070", "url": "https://attack.mitre.org/techniques/T1070"}
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1070-001",
+      "name": "Clear Windows Event Logs",
+      "x_mitre_is_subtechnique": true,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "defense-evasion"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1070.001", "url": "https://attack.mitre.org/techniques/T1070/001"}
+      ]
+    },
+    {
+      "type": "relationship",
+      "id": "relationship--e2e-4",
+      "relationship_type": "subtechnique-of",
+      "source_ref": "attack-pattern--e2e-t1070-001",
+      "target_ref": "attack-pattern--e2e-t1070"
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1547",
+      "name": "Boot or Logon Autostart Execution",
+      "x_mitre_is_subtechnique": false,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "persistence"},
+        {"kill_chain_name": "mitre-attack", "phase_name": "privilege-escalation"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1547", "url": "https://attack.mitre.org/techniques/T1547"}
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1547-001",
+      "name": "Registry Run Keys / Startup Folder",
+      "x_mitre_is_subtechnique": true,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "persistence"},
+        {"kill_chain_name": "mitre-attack", "phase_name": "privilege-escalation"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1547.001", "url": "https://attack.mitre.org/techniques/T1547/001"}
+      ]
+    },
+    {
+      "type": "relationship",
+      "id": "relationship--e2e-5",
+      "relationship_type": "subtechnique-of",
+      "source_ref": "attack-pattern--e2e-t1547-001",
+      "target_ref": "attack-pattern--e2e-t1547"
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1053",
+      "name": "Scheduled Task/Job",
+      "x_mitre_is_subtechnique": false,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "execution"},
+        {"kill_chain_name": "mitre-attack", "phase_name": "persistence"},
+        {"kill_chain_name": "mitre-attack", "phase_name": "privilege-escalation"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1053", "url": "https://attack.mitre.org/techniques/T1053"}
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1053-005",
+      "name": "Scheduled Task",
+      "x_mitre_is_subtechnique": true,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "execution"},
+        {"kill_chain_name": "mitre-attack", "phase_name": "persistence"},
+        {"kill_chain_name": "mitre-attack", "phase_name": "privilege-escalation"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1053.005", "url": "https://attack.mitre.org/techniques/T1053/005"}
+      ]
+    },
+    {
+      "type": "relationship",
+      "id": "relationship--e2e-6",
+      "relationship_type": "subtechnique-of",
+      "source_ref": "attack-pattern--e2e-t1053-005",
+      "target_ref": "attack-pattern--e2e-t1053"
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1078",
+      "name": "Valid Accounts",
+      "x_mitre_is_subtechnique": false,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "initial-access"},
+        {"kill_chain_name": "mitre-attack", "phase_name": "persistence"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1078", "url": "https://attack.mitre.org/techniques/T1078"}
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1136-001",
+      "name": "Local Account",
+      "x_mitre_is_subtechnique": true,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "persistence"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1136.001", "url": "https://attack.mitre.org/techniques/T1136/001"}
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1136",
+      "name": "Create Account",
+      "x_mitre_is_subtechnique": false,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "persistence"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1136", "url": "https://attack.mitre.org/techniques/T1136"}
+      ]
+    },
+    {
+      "type": "relationship",
+      "id": "relationship--e2e-7",
+      "relationship_type": "subtechnique-of",
+      "source_ref": "attack-pattern--e2e-t1136-001",
+      "target_ref": "attack-pattern--e2e-t1136"
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1548-003",
+      "name": "Sudo and Sudo Caching",
+      "x_mitre_is_subtechnique": true,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "privilege-escalation"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1548.003", "url": "https://attack.mitre.org/techniques/T1548/003"}
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1548",
+      "name": "Abuse Elevation Control Mechanism",
+      "x_mitre_is_subtechnique": false,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "privilege-escalation"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1548", "url": "https://attack.mitre.org/techniques/T1548"}
+      ]
+    },
+    {
+      "type": "relationship",
+      "id": "relationship--e2e-8",
+      "relationship_type": "subtechnique-of",
+      "source_ref": "attack-pattern--e2e-t1548-003",
+      "target_ref": "attack-pattern--e2e-t1548"
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1190",
+      "name": "Exploit Public-Facing Application",
+      "x_mitre_is_subtechnique": false,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "initial-access"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1190", "url": "https://attack.mitre.org/techniques/T1190"}
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1595-002",
+      "name": "Vulnerability Scanning",
+      "x_mitre_is_subtechnique": true,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "reconnaissance"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1595.002", "url": "https://attack.mitre.org/techniques/T1595/002"}
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1595",
+      "name": "Active Scanning",
+      "x_mitre_is_subtechnique": false,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "reconnaissance"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1595", "url": "https://attack.mitre.org/techniques/T1595"}
+      ]
+    },
+    {
+      "type": "relationship",
+      "id": "relationship--e2e-9",
+      "relationship_type": "subtechnique-of",
+      "source_ref": "attack-pattern--e2e-t1595-002",
+      "target_ref": "attack-pattern--e2e-t1595"
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1505-003",
+      "name": "Web Shell",
+      "x_mitre_is_subtechnique": true,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "persistence"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1505.003", "url": "https://attack.mitre.org/techniques/T1505/003"}
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--e2e-t1505",
+      "name": "Server Software Component",
+      "x_mitre_is_subtechnique": false,
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "persistence"}
+      ],
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1505", "url": "https://attack.mitre.org/techniques/T1505"}
+      ]
+    },
+    {
+      "type": "relationship",
+      "id": "relationship--e2e-10",
+      "relationship_type": "subtechnique-of",
+      "source_ref": "attack-pattern--e2e-t1505-003",
+      "target_ref": "attack-pattern--e2e-t1505"
+    }
+  ]
+}

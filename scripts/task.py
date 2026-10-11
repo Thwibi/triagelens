@@ -265,6 +265,19 @@ def task_frontend_build() -> int:
     return _run([_npm(), "run", "build"], cwd=FRONTEND)
 
 
+def task_e2e() -> int:
+    """Browser end-to-end tests (Playwright) against the built app.
+
+    Builds the frontend into ``backend/app/static`` first because the harness
+    (`e2e/serve.mjs`) serves the production bundle and the API from one origin.
+    Requires a project virtualenv and ``npm run e2e:install`` once for Chromium.
+    """
+    code = task_frontend_build()
+    if code:
+        return code
+    return _run([_npm(), "run", "e2e"], cwd=FRONTEND)
+
+
 def task_dev() -> int:
     """Run the Vite dev server with the API proxied to port 8787."""
     return _run([_npm(), "run", "dev"], cwd=FRONTEND)
@@ -388,6 +401,7 @@ TASKS: dict[str, Callable[[], int]] = {
     "frontend-typecheck": task_frontend_typecheck,
     "frontend-test": task_frontend_test,
     "frontend-build": task_frontend_build,
+    "e2e": task_e2e,
     "openapi": task_openapi,
     "openapi-check": task_openapi_check,
     "dev": task_dev,

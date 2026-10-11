@@ -77,7 +77,7 @@ export default tseslint.config(
   },
   {
     // Plain-JS build tooling: recommended rules, no type information needed.
-    files: ['**/*.js'],
+    files: ['**/*.js', '**/*.mjs'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'module',
@@ -92,6 +92,13 @@ export default tseslint.config(
     },
     rules: {
       'no-console': 'off',
+    },
+  },
+  {
+    // Browser E2E specs and helpers run under Node (Playwright).
+    files: ['e2e/**/*.ts'],
+    languageOptions: {
+      globals: { ...globals.node },
     },
   },
 )

@@ -59,6 +59,7 @@ On Windows use `.\scripts\run.ps1`, or `.\.venv\Scripts\python.exe scripts\task.
 | Type-check | `make typecheck` | Strict mypy, then TypeScript in no-emit mode |
 | Test | `make test` | pytest for the backend, Vitest for the frontend |
 | Coverage | `make backend-coverage` | pytest with a coverage floor |
+| E2E | `make e2e` | Build the app and run the Playwright browser scenarios (needs `npx playwright install chromium` once) |
 | Build | `make build` | All of the above, then the production frontend build |
 | Format | `make backend-format` | Apply Ruff's formatter and safe fixes |
 | Dev server | `make dev` | Vite with the API proxied to port 8787 |
