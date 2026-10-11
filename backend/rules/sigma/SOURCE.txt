@@ -19,15 +19,37 @@ network take every routing candidate. Correlation rules and rules with
 load, compile or routing problems are excluded and counted below.
 
 Generated (UTC): 2026-10-09T02:12:56+00:00
-Tree SHA-256: fbb1798c0b5303456930e1d477483378dc4333f36481c2bfccf8897f8dcf3829
+Tree SHA-256: a2c3f33d76a44dbddd5fb537e3c73e07c4e128c8d9624db54dfbb7484cdf891f
 Source SHA-256: c68b809a8621406ad82469954624b6468064cf595a575b1bb2fdba2ab0b2c88a
 
-Selected: 374 rule document(s)
-  windows   147 file(s),  147 rule(s)
+Selected: 378 rule document(s)
+  windows   151 file(s),  151 rule(s)
   linux     186 file(s),  186 rule(s)
   web        40 file(s),   40 rule(s)
   network     1 file(s),    1 rule(s)
-  TOTAL     374 file(s),  374 rule(s)
+  TOTAL     378 file(s),  378 rule(s)
+
+Manual amendments (2026-10-11)
+------------------------------
+Four Scenario C rules (spec 09 section 7) were added to the vendored tree by
+hand, each copied verbatim from the pinned commit except where noted, and the
+tree digest above was recomputed:
+
+  windows/builtin/security/win_security_audit_log_cleared.yml
+      - Security Eventlog Cleared (T1070.001). The pinned copy carries
+        ``related: type: obsoletes``, which pySigma rejects ("obsoletes is not
+        a Sigma related valid type"); the type is corrected to the valid
+        ``obsolete`` so the rule loads. Detection logic is unchanged.
+  windows/builtin/security/win_security_susp_scheduled_task_creation.yml
+      - Suspicious Scheduled Task Creation (T1053.005).
+  windows/process_creation/proc_creation_win_powershell_base64_encoded_cmd.yml
+      - Suspicious Encoded PowerShell Command Line (T1059.001).
+  windows/registry/registry_set/registry_set_susp_run_key_img_folder.yml
+      - New RUN Key Pointing to Suspicious Folder (T1547.001).
+
+These raise the windows total to 151 files / 151 rules and the grand total to
+378. The "load problem" count below is the pre-amendment report and still lists
+win_security_audit_log_cleared.yml; it is now vendored.
 
 Candidates and exclusions per category
 --------------------------------------

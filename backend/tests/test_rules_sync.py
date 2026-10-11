@@ -28,9 +28,9 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 _BUILTIN_DIR = BACKEND_ROOT / "rules" / "builtin"
 _MAP = BACKEND_ROOT / "rules" / "logsource_map.yaml"
 
-#: Catalogue size grown by a full startup sync: 16 builtin + 374 SigmaHQ.
+#: Catalogue size grown by a full startup sync: 16 builtin + 378 SigmaHQ.
 _SHIPPED = 16
-_SIGMA = 374
+_SIGMA = 378
 _TOTAL = _SHIPPED + _SIGMA
 
 
