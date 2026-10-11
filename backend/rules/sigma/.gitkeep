@@ -1,4 +1,0 @@
-# Bundled Sigma rules, loaded by the detection engine in a later phase.
-#
-# Kept in git so a checkout works offline; upstream rule content is added by
-# `make rules-import`, which is deliberately not part of Phase 0.

@@ -1,0 +1,70 @@
+SigmaHQ detection rules vendored into TriageLens
+===============================================
+
+Upstream: https://github.com/SigmaHQ/sigma
+Pinned commit: 48f2d096991a9ae89fd2710804901d1cd88d9746
+Commit date: 2024-05-31T14:53:22+02:00
+License: Detection Rule License (DRL) 1.1 - see LICENSE (SPDX: DRL-1.1)
+License text: https://github.com/SigmaHQ/Detection-Rule-License/blob/main/LICENSE.Detection.Rules.md
+Vendoring tool: scripts/update_rules.py
+
+Selection policy
+----------------
+Only detection rules that parse, compile with the pysigma-backend-sqlite
+compiler and route through the shipped logsource_map.yaml are vendored.
+Source dirs: rules/{windows,linux,web,network}. A multi-document file is
+vendored whole or not at all. windows is budgeted across its top-level
+rule families (high 90, medium 70, critical 5, low 5); linux, web and
+network take every routing candidate. Correlation rules and rules with
+load, compile or routing problems are excluded and counted below.
+
+Generated (UTC): 2026-10-09T02:12:56+00:00
+Tree SHA-256: fbb1798c0b5303456930e1d477483378dc4333f36481c2bfccf8897f8dcf3829
+Source SHA-256: c68b809a8621406ad82469954624b6468064cf595a575b1bb2fdba2ab0b2c88a
+
+Selected: 374 rule document(s)
+  windows   147 file(s),  147 rule(s)
+  linux     186 file(s),  186 rule(s)
+  web        40 file(s),   40 rule(s)
+  network     1 file(s),    1 rule(s)
+  TOTAL     374 file(s),  374 rule(s)
+
+Candidates and exclusions per category
+--------------------------------------
+windows: 2235 candidate file(s)
+  load problem: 112
+    - windows/builtin/security/account_management/win_security_member_added_security_enabled_global_group.yml - A Member Was Added to a Security-Enabled Global Group
+    - windows/builtin/security/account_management/win_security_member_removed_security_enabled_global_group.yml - A Member Was Removed From a Security-Enabled Global Group
+    - windows/builtin/security/account_management/win_security_security_enabled_global_group_deleted.yml - A Security-Enabled Global Group Was Deleted
+    - windows/builtin/security/win_security_audit_log_cleared.yml - Security Eventlog Cleared
+    - windows/builtin/system/microsoft_windows_eventlog/win_system_eventlog_cleared.yml - Eventlog Cleared
+    - windows/builtin/system/microsoft_windows_kernel_general/win_system_susp_critical_hive_location_access_bits_cleared.yml - Critical Hive In Suspicious Location Access Bits Cleared
+  unroutable: 50
+    - windows/builtin/applocker/win_applocker_file_was_not_allowed_to_run.yml - File Was Not Allowed To Run
+    - windows/builtin/appmodel_runtime/win_appmodel_runtime_sysinternals_tools_appx_execution.yml - Sysinternals Tools AppX Versions Execution
+    - windows/builtin/appxdeployment_server/win_appxdeployment_server_applocker_block.yml - Deployment AppX Package Was Blocked By AppLocker
+    - windows/builtin/appxdeployment_server/win_appxdeployment_server_mal_appx_names.yml - Potential Malicious AppX Package Installation Attempts
+    - windows/builtin/appxdeployment_server/win_appxdeployment_server_policy_block.yml - Deployment Of The AppX Package Was Blocked By The Policy
+    - windows/builtin/appxdeployment_server/win_appxdeployment_server_susp_appx_package_installation.yml - Suspicious AppX Package Installation Attempt
+linux: 190 candidate file(s)
+  load problem: 1
+    - linux/auditd/lnx_auditd_unix_shell_configuration_modification.yml - Unix Shell Configuration Modification
+  unroutable: 3
+    - linux/builtin/clamav/lnx_clamav_relevant_message.yml - Relevant ClamAV Message
+    - linux/builtin/guacamole/lnx_guacamole_susp_guacamole.yml - Guacamole Two Users Sharing Session Anomaly
+    - linux/builtin/vsftpd/lnx_vsftpd_susp_error_messages.yml - Suspicious VSFTPD Error Messages
+web: 44 candidate file(s)
+  load problem: 1
+    - web/proxy_generic/proxy_hktl_cobalt_strike_malleable_c2_requests.yml - HackTool - CobaltStrike Malleable Profile Patterns - Proxy
+  unroutable: 3
+    - web/product/apache/web_apache_segfault.yml - Apache Segmentation Fault
+    - web/product/apache/web_apache_threading_error.yml - Apache Threading Error
+    - web/product/nginx/web_nginx_core_dump.yml - Nginx Core Dump
+network: 45 candidate file(s)
+  unroutable: 44
+    - network/cisco/aaa/cisco_cli_clear_logs.yml - Cisco Clear Logs
+    - network/cisco/aaa/cisco_cli_collect_data.yml - Cisco Collect Data
+    - network/cisco/aaa/cisco_cli_crypto_actions.yml - Cisco Crypto Commands
+    - network/cisco/aaa/cisco_cli_disable_logging.yml - Cisco Disabling Logging
+    - network/cisco/aaa/cisco_cli_discovery.yml - Cisco Discovery
+    - network/cisco/aaa/cisco_cli_dos.yml - Cisco Denial of Service
