@@ -178,6 +178,23 @@ def _copy_tree(
     shutil.copytree(source, target, ignore=ignore, dirs_exist_ok=True)
 
 
+def _runtime_leaks(backend_in_bundle: Path) -> list[str]:
+    """Runtime artefacts that slipped into the bundled ``data/`` (must be empty).
+
+    A belt-and-braces check on the exclusion above: a bundle carrying a database
+    or case/report/log trees would leak one operator's data onto another's
+    machine, which is severe enough to fail the build over rather than trust the
+    ignore patterns alone.
+    """
+    data = backend_in_bundle / "data"
+    database = ("triagelens.db", "triagelens.db-shm", "triagelens.db-wal")
+    leaks = [name for name in database if (data / name).exists()]
+    leaks += [path.name for path in data.glob("*.sqlite3")]
+    folders = ("cases", "reports", "logs", "imports", "custom_rules", "rules")
+    leaks += [f"{folder}/" for folder in folders if (data / folder).exists()]
+    return leaks
+
+
 def _write_offline_requirements(bundle: Path, pins: Sequence[tuple[str, str]]) -> None:
     """Write the pin list the installer uses.
 
@@ -338,6 +355,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             (bundle / "backend").mkdir(exist_ok=True)
             shutil.copy2(source, bundle / "backend" / item)
+
+    leaks = _runtime_leaks(bundle / "backend")
+    if leaks:
+        print(
+            "runtime state leaked into the bundle: " + ", ".join(sorted(leaks)),
+            file=sys.stderr,
+        )
+        return 1
 
     # The frontend build output is already inside backend/app/static.
     if not (bundle / "backend" / "app" / "static" / "index.html").is_file():
