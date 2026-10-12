@@ -54,6 +54,7 @@ environment are in `docs/COMPLIANCE.md`; the open gaps are listed below.
 | Benchmarks | `.venv\Scripts\python.exe scripts\task.py perf` | 15 primitive benchmarks, refreshed `docs/perf-results.md` |
 | End-to-end perf | `.venv\Scripts\python.exe scripts\task.py perf-e2e` (`smoke` scale here) | 6/6 end-to-end runs pass; 9 target verdicts in `docs/perf-e2e-results.md` — detection, API first page, FTS p95, UI first paint and peak RSS meet target, three throughput targets (text single/multi, EVTX) FAIL and are documented, not waived |
 | UI first paint | `.venv\Scripts\python.exe scripts\task.py perf-ui` | Playwright first paint of the Alerts table with 1,000 alerts ≈ 450 ms vs the 1 s spec budget (PASS); verdict merged into `docs/perf-e2e-results.md` |
+| Offline bundle | `python scripts\task.py package`, then `install.ps1` / `install.sh` with the network blocked | 37 verified wheels (11.8 MiB); a fresh venv installs from the wheelhouse and the app boots, `GET /api/health` ready (FTS5/JSON1). The bundle carries no runtime state (database, `cases/`, `logs/`, `reports/`) — see `docs/DECISIONS.md` |
 | Audits | `npm audit --audit-level=high` (in `frontend/`); `pip-audit -r backend/requirements.lock` | npm: 0 vulnerabilities; pip-audit: only the accepted `diskcache` advisory (diskcache 5.6.3, PYSEC-2026-2447; no fix, unreachable — see DECISIONS), otherwise clean |
 | CI | `.github/workflows/ci.yml` | backend lint/typecheck/coverage, frontend lint/typecheck/test/`npm audit`/bundle budget, a `pip-audit` job, and a browser `e2e` job; not yet executed on a runner |
 
@@ -84,10 +85,11 @@ environment are in `docs/COMPLIANCE.md`; the open gaps are listed below.
   perf-ui`) and merged into the document. See `docs/DECISIONS.md` and
   `docs/COMPLIANCE.md`.
 - The final verification (9f) could not run everything here: the clean-machine
-  offline install is unrun. The browser E2E suite (`frontend/e2e/`, six
-  Playwright tests including the axe-core a11y scan) and the bundle-size budget
-  were added afterwards. The remaining unrun check is itemised in
-  `docs/COMPLIANCE.md` and `docs/DECISIONS.md`.
+  offline install on a separate host is unrun, though the bundle now installs and
+  boots here with the network blocked (see `docs/DECISIONS.md`). The browser E2E
+  suite (`frontend/e2e/`, six Playwright tests including the axe-core a11y scan)
+  and the bundle-size budget were added afterwards. The remaining unrun check is
+  itemised in `docs/COMPLIANCE.md` and `docs/DECISIONS.md`.
 - The optional IOC enrichment (spec 05 §9) is not implemented: `allow_enrichment`
   is a reserved flag surfaced only in `/api/health`, so there is no network
   client to gate. A full ingest → detect → report run opening zero non-loopback

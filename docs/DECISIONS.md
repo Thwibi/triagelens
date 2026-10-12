@@ -3,6 +3,39 @@
 Each entry records a decision that is not obvious from the code, why it was
 made, and what it costs. Newest first. Dates are ISO-8601.
 
+## 2026-10-12 — Offline bundle: the runtime-state leak, and a local no-network install
+
+**Decision.** `scripts/package_offline.py` now excludes per-install state when it
+copies `backend/data` into the bundle (`DATA_RUNTIME_ARTIFACTS`: `triagelens.db*`,
+`*.sqlite3`, `cases/`, `reports/`, `logs/`, `imports/`, `custom_rules/`, `rules/`).
+The bundle was rebuilt (37 wheels, 11.8 MiB) and the install was then exercised
+end-to-end on this host with the network blocked.
+
+**Why.** `backend/data` holds the bundled seed data (`attack/`, `profiles/`, the
+IANA TLD list, the MITRE fallbacks) but also collects per-install state, because
+the default `data_dir` (`./data`) resolves relative to the working directory — so
+running the app or the tests from `backend/` writes `triagelens.db`, `cases/`,
+`logs/`, `reports/` and `rules/custom/` into it. The old `_copy_tree` filtered only
+caches, so a freshly built bundle carried a live development database (cases,
+sources, audit rows) with its reports and logs. Shipping that leaks one operator's
+data onto another's machine — the opposite of the spec's local-only guarantee. The
+`.gitignore` already lists these exact artefacts for the same reason; the packager
+now mirrors that list. The rebuild also corrected a stale 23-wheel bundle, though
+the lockfile pins 37.
+
+**Verification (this host, no network).** With `HTTP_PROXY`/`HTTPS_PROXY` pointed at
+a dead port and `PIP_INDEX_URL` unreachable, a fresh Python 3.14 venv installed the
+bundle via `pip install --no-index --find-links wheels/ -r requirements-offline.txt`
+(37 wheels, no index), then `python -m app.main` from `bundle/backend` booted and
+`GET /api/health` returned `app_version 0.1.0`, `sqlite_version 3.50.4`,
+`fts5: true`, `json1: true`, `workers: 7`. The installed tree contains no
+`cases/`, `logs/`, `reports/` or database.
+
+**Cost.** The bundle intentionally omits the runtime `data/rules` directory —
+custom rules are operator state and the app recreates it. A separate physical
+network-disabled machine is still unrun; this is a local no-network install, and it
+is recorded as such in `docs/COMPLIANCE.md`.
+
 ## 2026-10-12 — Spec 09 §8 end-to-end performance harness
 
 **Decision.** The §8 end-to-end targets are measured by a new self-contained

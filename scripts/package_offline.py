@@ -52,6 +52,25 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 #: pyproject.toml is required: pip installs backend/ as a package, not a plain dir.
 BUNDLE_BACKEND = ("app", "migrations", "rules", "data", "pyproject.toml", "README.md")
 
+#: ``backend/data`` holds the bundled seed data (attack/, profiles/, the IANA TLD
+#: list and the MITRE fallbacks). In a working tree it also collects per-install
+#: state, because the default ``data_dir`` resolves relative to the working
+#: directory. None of it may ship: a bundle carrying a database, cases, reports or
+#: logs would leak one operator's data onto another's machine. Mirrors the
+#: ``.gitignore`` list, which keeps the same artefacts out of the source tree.
+DATA_RUNTIME_ARTIFACTS = (
+    "triagelens.db",
+    "triagelens.db-shm",
+    "triagelens.db-wal",
+    "*.sqlite3",
+    "cases",
+    "reports",
+    "logs",
+    "imports",
+    "custom_rules",
+    "rules",
+)
+
 
 def _version() -> str:
     """The application version, taken from pyproject."""
@@ -148,10 +167,12 @@ def _download_wheels(
     return sum(1 for _ in target.glob("*.whl"))
 
 
-def _copy_tree(source: Path, destination: Path, name: str) -> None:
-    """Copy a directory, skipping caches and anything already ignored."""
+def _copy_tree(
+    source: Path, destination: Path, name: str, *, extra_ignore: Sequence[str] = ()
+) -> None:
+    """Copy a directory, skipping caches and any runtime artefacts named."""
     ignore = shutil.ignore_patterns(
-        "__pycache__", "*.pyc", ".pytest_cache", ".mypy_cache"
+        "__pycache__", "*.pyc", ".pytest_cache", ".mypy_cache", *extra_ignore
     )
     target = destination / name
     shutil.copytree(source, target, ignore=ignore, dirs_exist_ok=True)
@@ -312,7 +333,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"missing {source}; skipping", file=sys.stderr)
             continue
         if source.is_dir():
-            _copy_tree(source, bundle / "backend", item)
+            extra = DATA_RUNTIME_ARTIFACTS if item == "data" else ()
+            _copy_tree(source, bundle / "backend", item, extra_ignore=extra)
         else:
             (bundle / "backend").mkdir(exist_ok=True)
             shutil.copy2(source, bundle / "backend" / item)

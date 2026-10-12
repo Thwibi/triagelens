@@ -160,7 +160,7 @@ No literal "MUST" tokens; normative. Covered by `test_reports.py`,
 | Multi-stage Dockerfile (Node build + python:3.12-slim, lockfile `--require-hashes`, non-root, EXPOSE 8787, HEALTHCHECK, optional `WITH_PDF=1`) | `docker/Dockerfile` | — | Covered (build verified by inspection; image run not executed here) |
 | Compose: loopback-published port, token, volume, healthcheck | `docker/compose.yaml`, `scripts/compose.sh`/`.ps1` | — | Covered |
 | Bare metal `run.sh`/`run.ps1` (venv, FTS5/JSON1 verify, migrations, uvicorn, browser) | `scripts/run.sh`, `scripts/run.ps1` | — | Covered |
-| Offline bundle (`make package`): wheelhouse, built frontend, rules/data | `scripts/package_offline.py` | — | Covered (build not run to clean install here) |
+| Offline bundle (`make package`): wheelhouse, built frontend, rules/data | `scripts/package_offline.py` | offline install smoke-verified (2026-10-12) | Covered (installs and boots with the network blocked; runtime-state leak fixed — see `docs/DECISIONS.md`) |
 | Manual-only updates (no update checks) | `scripts/update_rules.py`, `scripts/update_attack.py` | `test_mitre.py` | Covered |
 
 ### Operations (spec 10 §5)
@@ -191,9 +191,15 @@ remaining work.
    by an axe-core WCAG 2.1 A/AA scan of the thirteen main screens
    (`frontend/e2e/a11y.spec.ts`), but the literal Lighthouse ≥ 95 tool is not
    installed here; the axe rule set is the deterministic offline equivalent.
-2. **Offline clean-machine install not executed.** `make package` and the
-   installer exist, but the bundle was not installed on a separate
-   network-disabled machine.
+2. **Offline clean-machine install verified locally, separate machine unrun.**
+   `make package` now produces a complete 37-wheel bundle and the install was
+   exercised end-to-end here with the network blocked (`pip --no-index`, dead
+   proxies): a fresh venv installs from `wheels/`, `python -m app.main` boots the
+   bundled app, and `GET /api/health` returns ready with FTS5/JSON1. Building the
+   bundle exposed and fixed a leak — `backend/data` collected runtime state
+   (the database, `cases/`, `logs/`, `reports/`) that the packager copied into the
+   bundle; it is now excluded (see `docs/DECISIONS.md`). A separate physical
+   network-disabled machine has still not been used.
 3. **Spec 09 §8 end-to-end performance targets: measured, three missed.** The
    end-to-end harness (`make perf-e2e` →
    `docs/perf-e2e-results.md`) now runs the §8 paths. On this host, detection
