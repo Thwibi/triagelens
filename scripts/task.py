@@ -177,13 +177,40 @@ def task_perf() -> int:
     return _run([str(venv_python()), str(ROOT / "scripts" / "run_perf.py")], cwd=ROOT)
 
 
+def task_perf_ui() -> int:
+    """Measure the spec 09 section 8 UI first-paint target with Playwright.
+
+    Builds the frontend, then runs only ``e2e/perf.spec.ts``; that spec writes its
+    verdict to ``frontend/e2e/.artifacts/ui-first-paint.json``, which the next
+    ``run_perf.py --e2e`` merges into ``docs/perf-e2e-results.md``.
+    """
+    artifact = FRONTEND / "e2e" / ".artifacts" / "ui-first-paint.json"
+    artifact.unlink(missing_ok=True)
+    code = task_frontend_build()
+    if code:
+        return code
+    return _run([_npm(), "run", "e2e", "--", "perf.spec.ts"], cwd=FRONTEND)
+
+
 def task_perf_e2e() -> int:
     """Run the spec 09 section 8 end-to-end targets.
 
     The scale comes from ``TRIAGELENS_PERF_SCALE`` (``full`` by default, the spec
     size; ``smoke`` for a laptop), which the Makefile's ``SCALE`` variable sets.
+    The browser-bound UI paint target runs first (best-effort: it needs Node and
+    Chromium, and is skipped when ``TRIAGELENS_PERF_SKIP_UI`` is set), then the
+    backend harness merges its verdict into the document.
     """
     scale = os.environ.get("TRIAGELENS_PERF_SCALE") or "full"
+    if not os.environ.get("TRIAGELENS_PERF_SKIP_UI"):
+        _log(
+            "measuring the UI first-paint target (set TRIAGELENS_PERF_SKIP_UI=1 to skip)"
+        )
+        try:
+            if task_perf_ui() != 0:
+                _log("UI perf spec failed; the UI target will be reported as not-run")
+        except (SystemExit, OSError) as error:
+            _log(f"could not run the UI perf spec ({error}); skipping the UI target")
     return _run(
         [
             str(venv_python()),
@@ -421,6 +448,7 @@ TASKS: dict[str, Callable[[], int]] = {
     "backend-test": task_backend_test,
     "backend-coverage": task_backend_coverage,
     "perf": task_perf,
+    "perf-ui": task_perf_ui,
     "perf-e2e": task_perf_e2e,
     "package": task_package,
     "backend-lock": task_backend_lock,

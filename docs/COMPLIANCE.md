@@ -104,7 +104,7 @@ No literal "MUST" tokens; normative. Covered by `test_reports.py`,
 | §9 S-07 YAML bombs rejected (size/alias limits) | `app/detect/rules.py` `_AliasLimitedSafeLoader` (1 MB cap, alias-event count cap, SafeLoader tag rejection) | `test_detect_rules.py::TestYamlLimits` | Covered |
 | §9 S-08 XXE in event XML does not resolve entities | `app/ingest/parsers/windows_event_xml.py` (`resolve_entities=False`, `no_network=True`, `load_dtd=False`, `huge_tree=False`) | `test_ingest_windows.py::test_an_xxe_payload_does_not_leak_a_local_file` | Covered |
 | §9 S-09 crashing worker → source `failed`, server up, other jobs continue | worker + writer watchdog | `test_ingest_pipeline.py` (`os._exit` worker-crash test) | Covered |
-| §8 performance targets on the reference laptop | `backend/tests/perf/test_benchmarks.py` (storage/parse/IOC/health primitives) and `backend/tests/perf/test_end_to_end.py` (multi-worker ingest, detection, API/FTS p95, peak memory) | `make perf` → `docs/perf-results.md`; `make perf-e2e` → `docs/perf-e2e-results.md` | Measured on this host (three targets met, three throughput targets missed; see Gaps and `docs/DECISIONS.md`) |
+| §8 performance targets on the reference laptop | `backend/tests/perf/test_benchmarks.py` (storage/parse/IOC/health primitives), `backend/tests/perf/test_end_to_end.py` (multi-worker ingest, detection, API/FTS p95, peak memory) and `frontend/e2e/perf.spec.ts` (UI first paint) | `make perf` → `docs/perf-results.md`; `make perf-e2e` → `docs/perf-e2e-results.md` | Measured on this host (six targets met, three throughput targets missed; see Gaps and `docs/DECISIONS.md`) |
 
 ## 10 — Security and operations
 
@@ -198,19 +198,19 @@ remaining work.
    end-to-end harness (`make perf-e2e` →
    `docs/perf-e2e-results.md`) now runs the §8 paths. On this host, detection
    (1M-equivalent at smoke, ≤ 300 s and ≤ 2 GB), the Events API first page
-   (≤ 300 ms p95) and the FTS query (≤ 1 s p95) meet their targets, and peak
-   ingest RSS (≤ 1.5 GB) is well inside budget. The three *throughput* targets
-   are **not** met and are recorded as FAIL rather than hidden: text ingest is
-   ≈ 1.6k events/s per worker (target 30k) and ≈ 2.4k/s aggregate over four
-   workers (target 100k), and EVTX ingest is ≈ 46 records/s on the committed
-   fixtures (target 8k). Profiling puts ≈ 65 % of parse time in tier-1 IOC
-   extraction (`app/ioc/extract.py` `scan_text`) and the rest in generic-JSON
-   profile mapping (`app/ingest/profiles.py`), i.e. pure-Python CPU, not I/O.
-   The 10 GB ingest memory target and the §8 UI paint target are covered
-   separately: the former by the peak-memory test's scaling ratio, the latter by
-   the frontend Playwright harness. The reference-laptop verdict for the missed
-   throughput targets is unproven; see `docs/DECISIONS.md` for the profiling
-   entry and the smoke-vs-full rationale.
+   (≤ 300 ms p95), the FTS query (≤ 1 s p95), the UI first paint of Alerts with
+   1,000 alerts (≤ 1 s, measured by the frontend Playwright `perf.spec.ts` and
+   merged into the document) and peak ingest RSS (≤ 1.5 GB) all meet their
+   targets. The three *throughput* targets are **not** met and are recorded as
+   FAIL rather than hidden: text ingest is ≈ 1.6k events/s per worker (target
+   30k) and ≈ 2.4k/s aggregate over four workers (target 100k), and EVTX ingest
+   is ≈ 45 records/s on the committed fixtures (target 8k). Profiling puts
+   ≈ 65 % of parse time in tier-1 IOC extraction (`app/ioc/extract.py`
+   `scan_text`) and the rest in generic-JSON profile mapping
+   (`app/ingest/profiles.py`), i.e. pure-Python CPU, not I/O. The 10 GB ingest
+   memory target is covered by the peak-memory test's scaling ratio. The
+   reference-laptop verdict for the missed throughput targets is unproven; see
+   `docs/DECISIONS.md` for the profiling entry and the smoke-vs-full rationale.
 
 ## Accepted dependency risk
 

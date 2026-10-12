@@ -30,8 +30,10 @@ Events API first page, the FTS query and peak ingest RSS meet their targets.
 host and the reference-laptop verdict stays unproven; they are documented, not
 waived, in `docs/COMPLIANCE.md` and shown as FAIL in `docs/perf-e2e-results.md`.
 The `full` scale (1M/5M/8M rows) is too slow to run in routine CI, so it is a
-manual target. The §8 UI paint target lives in the frontend Playwright harness
-(which owns a browser) rather than here.
+manual target. The §8 UI first-paint target needs a browser, so it is measured
+separately by `frontend/e2e/perf.spec.ts` (`make perf-ui`); `make perf-e2e` runs
+that spec first and merges its `ui.alerts_first_paint` verdict into the same
+document, and skips it (leaving the row out) when Node or Chromium is absent.
 
 ## 2026-10-11 — pip-audit: accepted risk for the diskcache advisory
 

@@ -206,9 +206,11 @@ def render_targets(targets: Sequence[dict[str, Any]], generated: str) -> str:
         "size and is a regression baseline, not the reference verdict; the spec",
         "targets are set for the reference laptop (8 cores, 16 GB, NVMe).",
         "",
-        "The UI first-paint target (Alerts with 1,000 alerts under 1 s) is measured",
-        "by the frontend Playwright harness, which owns a browser, and is recorded",
-        "in `docs/DECISIONS.md` rather than here.",
+        "The UI first-paint target (Alerts with 1,000 alerts under 1 s) is",
+        "measured by the frontend Playwright perf spec (`frontend/e2e/perf.spec.ts`)",
+        "and appears above as `ui.alerts_first_paint` when that spec has run and its",
+        "artefact was merged; otherwise the row is absent and the target is recorded",
+        "as not-run in `docs/DECISIONS.md`.",
         "",
     ]
     return "\n".join(lines) + "\n"

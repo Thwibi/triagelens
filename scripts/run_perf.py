@@ -14,11 +14,15 @@ Usage::
     python scripts/run_perf.py                 # primitives -> docs/perf-results.md
     python scripts/run_perf.py --e2e           # targets    -> docs/perf-e2e-results.md
     python scripts/run_perf.py --e2e --scale smoke
+
+An ``--e2e`` run also merges the UI first-paint verdict recorded by the frontend
+Playwright perf spec (`frontend/e2e/perf.spec.ts`) when it is present.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -29,6 +33,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 RESULTS = "perf-results.json"
+
+#: The frontend Playwright perf spec (`frontend/e2e/perf.spec.ts`) writes its
+#: target verdict here; when present it is merged into the end-to-end document.
+UI_TARGETS = ROOT / "frontend" / "e2e" / ".artifacts" / "ui-first-paint.json"
 
 # Passed to pytest as -p so no plugin has to be importable from the repo.
 COLLECTOR = """
@@ -68,6 +76,22 @@ def pytest_addoption(parser):
     parser.addoption('--perf-out', default='perf-results.json',
                      help='where to write the collected measurements')
 """
+
+
+def _merge_frontend_targets(results_path: Path) -> None:
+    """Append the frontend Playwright perf target, when it has been produced.
+
+    The UI first-paint target needs a browser, so it is measured by
+    ``frontend/e2e/perf.spec.ts`` and written to :data:`UI_TARGETS`. Merging it
+    here keeps that target in the same verdict document as the backend ones.
+    """
+    if not UI_TARGETS.is_file():
+        print(f"no frontend perf target at {UI_TARGETS}; skipping the UI row")
+        return
+    payload = json.loads(results_path.read_text(encoding="utf-8"))
+    extra = json.loads(UI_TARGETS.read_text(encoding="utf-8")).get("targets", [])
+    payload["targets"] = [*payload.get("targets", []), *extra]
+    results_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -136,6 +160,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not results_path.is_file():
             print("the benchmark run produced no results file", file=sys.stderr)
             return 1
+
+        if args.e2e:
+            _merge_frontend_targets(results_path)
 
         report = subprocess.run(
             [

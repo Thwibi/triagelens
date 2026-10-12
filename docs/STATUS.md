@@ -49,10 +49,11 @@ environment are in `docs/COMPLIANCE.md`; the open gaps are listed below.
 | Frontend lint | `npx --no-install eslint . --max-warnings 0` (in `frontend/`) | clean |
 | Frontend types | `npx --no-install tsc --build --force` (in `frontend/`) | clean |
 | Frontend tests | `npx --no-install vitest --run` (in `frontend/`) | 232 passed (30 files) |
-| Browser E2E | `python scripts\task.py e2e` (builds the app, then Playwright) | 5 passed — Scenarios A/B/C + the S-02 XSS render check (spec 09 §7) + the axe-core a11y scan of the 13 main screens; Chromium headless |
+| Browser E2E | `python scripts\task.py e2e` (builds the app, then Playwright) | 6 passed — Scenarios A/B/C + the S-02 XSS render check (spec 09 §7) + the axe-core a11y scan of the 13 main screens + the UI first-paint perf check; Chromium headless |
 | Bundle budget | `python scripts\task.py frontend-budget` (after a build) | 693 KB gzipped vs the 1.5 MB spec 07 budget (PASS) |
 | Benchmarks | `.venv\Scripts\python.exe scripts\task.py perf` | 15 primitive benchmarks, refreshed `docs/perf-results.md` |
-| End-to-end perf | `.venv\Scripts\python.exe scripts\task.py perf-e2e` (`smoke` scale here) | 6/6 end-to-end runs pass; 8 target verdicts in `docs/perf-e2e-results.md` — detection, API first page, FTS p95 and peak RSS meet target, three throughput targets (text single/multi, EVTX) FAIL and are documented, not waived |
+| End-to-end perf | `.venv\Scripts\python.exe scripts\task.py perf-e2e` (`smoke` scale here) | 6/6 end-to-end runs pass; 9 target verdicts in `docs/perf-e2e-results.md` — detection, API first page, FTS p95, UI first paint and peak RSS meet target, three throughput targets (text single/multi, EVTX) FAIL and are documented, not waived |
+| UI first paint | `.venv\Scripts\python.exe scripts\task.py perf-ui` | Playwright first paint of the Alerts table with 1,000 alerts ≈ 450 ms vs the 1 s spec budget (PASS); verdict merged into `docs/perf-e2e-results.md` |
 | Audits | `npm audit --audit-level=high` (in `frontend/`); `pip-audit -r backend/requirements.lock` | npm: 0 vulnerabilities; pip-audit: only the accepted `diskcache` advisory (diskcache 5.6.3, PYSEC-2026-2447; no fix, unreachable — see DECISIONS), otherwise clean |
 | CI | `.github/workflows/ci.yml` | backend lint/typecheck/coverage, frontend lint/typecheck/test/`npm audit`/bundle budget, a `pip-audit` job, and a browser `e2e` job; not yet executed on a runner |
 
@@ -75,14 +76,15 @@ environment are in `docs/COMPLIANCE.md`; the open gaps are listed below.
 - The spec 09 §8 end-to-end targets are now measured (`make perf-e2e` →
   `docs/perf-e2e-results.md`), but three throughput targets are **missed** on
   this host: text ingest ≈ 1.6k events/s per worker (target 30k) and ≈ 2.4k/s
-  over four workers (target 100k); EVTX ≈ 46 records/s on the tiny committed
+  over four workers (target 100k); EVTX ≈ 45 records/s on the tiny committed
   fixtures (target 8k). Profiling attributes the bottleneck to tier-1 IOC
   extraction and generic-JSON mapping (pure-Python CPU). The `full` scale
-  (1M/5M/8M rows) and the §8 UI paint target are not run in CI: the former is a
-  manual reference-hardware run, the latter lives in the frontend Playwright
-  harness. See `docs/DECISIONS.md` and `docs/COMPLIANCE.md`.
+  (1M/5M/8M rows) is a manual reference-hardware run, not a CI gate. The UI
+  first-paint target is measured by the frontend Playwright spec (`make
+  perf-ui`) and merged into the document. See `docs/DECISIONS.md` and
+  `docs/COMPLIANCE.md`.
 - The final verification (9f) could not run everything here: the clean-machine
-  offline install is unrun. The browser E2E suite (`frontend/e2e/`, five
+  offline install is unrun. The browser E2E suite (`frontend/e2e/`, six
   Playwright tests including the axe-core a11y scan) and the bundle-size budget
   were added afterwards. The remaining unrun check is itemised in
   `docs/COMPLIANCE.md` and `docs/DECISIONS.md`.

@@ -59,7 +59,7 @@ On Windows use `.\scripts\run.ps1`, or `.\.venv\Scripts\python.exe scripts\task.
 | Type-check | `make typecheck` | Strict mypy, then TypeScript in no-emit mode |
 | Test | `make test` | pytest for the backend, Vitest for the frontend |
 | Coverage | `make backend-coverage` | pytest with a coverage floor |
-| E2E | `make e2e` | Build the app and run the Playwright browser scenarios and the axe-core accessibility scan (needs `npx playwright install chromium` once) |
+| E2E | `make e2e` | Build the app and run the Playwright browser scenarios, the axe-core accessibility scan and the UI first-paint perf check (needs `npx playwright install chromium` once) |
 | Bundle budget | `make frontend-budget` | Enforce the spec 07 < 1.5 MB gzipped budget on the built frontend |
 | Build | `make build` | All of the above, then the production frontend build |
 | Format | `make backend-format` | Apply Ruff's formatter and safe fixes |
@@ -68,7 +68,8 @@ On Windows use `.\scripts\run.ps1`, or `.\.venv\Scripts\python.exe scripts\task.
 | Lockfile | `make backend-lock` | Regenerate `backend/requirements.lock` |
 | Verify lock | `make lock-check` | Fail if the lockfile has drifted from `pyproject.toml` |
 | Benchmarks | `make perf` | Measure the storage layer and rewrite `docs/perf-results.md` |
-| End-to-end perf | `make perf-e2e SCALE=smoke\|full` | Run the spec 09 §8 targets and rewrite `docs/perf-e2e-results.md` (`smoke` by default for a laptop) |
+| UI perf | `make perf-ui` | Measure the Alerts first-paint target with Playwright (build + Chromium) |
+| End-to-end perf | `make perf-e2e SCALE=smoke\|full` | Run the spec 09 §8 targets and rewrite `docs/perf-e2e-results.md` (`smoke` by default for a laptop); runs `perf-ui` first and merges its verdict |
 | Offline bundle | `make package` | Build an installable bundle into `dist/` |
 
 Run a single side when iterating: `make backend-test`, `make frontend-typecheck`,
