@@ -21,6 +21,12 @@ limitations, and [docs/DECISIONS.md](docs/DECISIONS.md) for the deliberate
 deviations from the specs. The specifications being built against live in
 [docs/spec](docs/spec).
 
+## Demo
+
+A short product teaser:
+
+[Watch the teaser](docs/media/triagelens-teaser.mp4)
+
 ## Requirements
 
 - Python 3.11 or newer (3.12 recommended; the container image uses 3.12)
