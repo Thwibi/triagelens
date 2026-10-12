@@ -177,6 +177,25 @@ def task_perf() -> int:
     return _run([str(venv_python()), str(ROOT / "scripts" / "run_perf.py")], cwd=ROOT)
 
 
+def task_perf_e2e() -> int:
+    """Run the spec 09 section 8 end-to-end targets.
+
+    The scale comes from ``TRIAGELENS_PERF_SCALE`` (``full`` by default, the spec
+    size; ``smoke`` for a laptop), which the Makefile's ``SCALE`` variable sets.
+    """
+    scale = os.environ.get("TRIAGELENS_PERF_SCALE") or "full"
+    return _run(
+        [
+            str(venv_python()),
+            str(ROOT / "scripts" / "run_perf.py"),
+            "--e2e",
+            "--scale",
+            scale,
+        ],
+        cwd=ROOT,
+    )
+
+
 def task_package() -> int:
     """Build the offline install bundle into ``dist/``."""
     return _run(
@@ -402,6 +421,7 @@ TASKS: dict[str, Callable[[], int]] = {
     "backend-test": task_backend_test,
     "backend-coverage": task_backend_coverage,
     "perf": task_perf,
+    "perf-e2e": task_perf_e2e,
     "package": task_package,
     "backend-lock": task_backend_lock,
     "lock-check": task_lock_check,

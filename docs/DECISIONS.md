@@ -3,6 +3,36 @@
 Each entry records a decision that is not obvious from the code, why it was
 made, and what it costs. Newest first. Dates are ISO-8601.
 
+## 2026-10-12 — Spec 09 §8 end-to-end performance harness
+
+**Decision.** The §8 end-to-end targets are measured by a new self-contained
+harness, `backend/tests/perf/test_end_to_end.py`, run via `make perf-e2e`
+(→ `docs/perf-e2e-results.md`) at a `smoke` scale by default and a `full` scale
+on reference hardware. It reuses the production topology — spawn worker
+processes, bounded manager queues, one shared `DBWriter`, the real
+`parse_and_emit` / `DetectRunner` / `EventRepository` — rather than reimplementing
+the paths, so the numbers are the code's, not a model's. The harness *records*
+the numeric verdict as a `perf_target` property and only asserts run
+correctness (events parsed == events written); the smoke scale is a regression
+baseline, not the reference verdict.
+
+**Why.** Spec 09 §8 names seven targets but left them unmeasured; the earlier
+`make perf` covers only primitives. Measuring them exposed the real bottleneck
+and forced an honest FAIL row instead of an estimate. Profiling the text path
+(`cProfile`, 20k ECS records) attributes ≈ 65 % of parse time to tier-1 IOC
+extraction (`app/ioc/extract.py` `scan_text` / `extract_fields`) and the rest to
+generic-JSON profile mapping (`app/ingest/profiles.py` `flatten` / `applies_to`);
+both are pure-Python CPU, so throughput is ≈ 1.6k events/s per worker — two
+orders of magnitude under the 30k/100k targets. On this host detection, the
+Events API first page, the FTS query and peak ingest RSS meet their targets.
+
+**Cost.** Three throughput targets (text single/multi-worker, EVTX) fail on this
+host and the reference-laptop verdict stays unproven; they are documented, not
+waived, in `docs/COMPLIANCE.md` and shown as FAIL in `docs/perf-e2e-results.md`.
+The `full` scale (1M/5M/8M rows) is too slow to run in routine CI, so it is a
+manual target. The §8 UI paint target lives in the frontend Playwright harness
+(which owns a browser) rather than here.
+
 ## 2026-10-11 — pip-audit: accepted risk for the diskcache advisory
 
 **Decision.** `pip-audit -r backend/requirements.lock` reports one advisory in a

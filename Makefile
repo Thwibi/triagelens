@@ -62,6 +62,9 @@ backend-coverage: ## Test the backend under coverage
 perf: ## Run the benchmarks and record docs/perf-results.md
 	$(TASK) perf
 
+perf-e2e: ## Run the spec 09 section 8 targets (SCALE=full|smoke)
+	TRIAGELENS_PERF_SCALE=$(SCALE) $(TASK) perf-e2e
+
 package: ## Build the offline install bundle into dist/
 	$(TASK) package
 

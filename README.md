@@ -68,6 +68,7 @@ On Windows use `.\scripts\run.ps1`, or `.\.venv\Scripts\python.exe scripts\task.
 | Lockfile | `make backend-lock` | Regenerate `backend/requirements.lock` |
 | Verify lock | `make lock-check` | Fail if the lockfile has drifted from `pyproject.toml` |
 | Benchmarks | `make perf` | Measure the storage layer and rewrite `docs/perf-results.md` |
+| End-to-end perf | `make perf-e2e SCALE=smoke\|full` | Run the spec 09 §8 targets and rewrite `docs/perf-e2e-results.md` (`smoke` by default for a laptop) |
 | Offline bundle | `make package` | Build an installable bundle into `dist/` |
 
 Run a single side when iterating: `make backend-test`, `make frontend-typecheck`,

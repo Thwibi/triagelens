@@ -1,21 +1,25 @@
 """Run the performance harness and write ``docs/perf-results.md``.
 
 Spec 09 section 8 requires benchmark results recorded with device information.
-This is the driver ``make perf`` calls: it runs ``backend/tests/perf`` with a
-small plugin that collects each benchmark's ``perf`` property, then hands the
-result to ``scripts/perf_report.py``.
+This is the driver ``make perf`` (primitives) and ``make perf-e2e`` (end-to-end
+targets) call: it runs ``backend/tests/perf`` with a small plugin that collects the
+``perf``/``perf_target`` properties each benchmark records, then hands the result
+to ``scripts/perf_report.py``.
 
 The benchmarks are excluded from the normal test run, because timing assertions
 are meaningless under a shared CI machine. Run them deliberately.
 
 Usage::
 
-    python scripts/run_perf.py
+    python scripts/run_perf.py                 # primitives -> docs/perf-results.md
+    python scripts/run_perf.py --e2e           # targets    -> docs/perf-e2e-results.md
+    python scripts/run_perf.py --e2e --scale smoke
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 import tempfile
@@ -33,6 +37,7 @@ import json
 class _Collector:
     def __init__(self):
         self.measurements = []
+        self.targets = []
 
     def pytest_runtest_logreport(self, report):
         if report.when != 'call' or not report.passed:
@@ -41,11 +46,17 @@ class _Collector:
         for name, value in raw:
             if name == 'perf':
                 self.measurements.extend(json.loads(value))
+            elif name == 'perf_target':
+                self.targets.extend(json.loads(value))
 
     def pytest_sessionfinish(self, session):
         path = session.config.stash['_perf_out']
         with open(path, 'w', encoding='utf-8') as handle:
-            json.dump({'measurements': self.measurements}, handle, indent=2)
+            json.dump(
+                {'measurements': self.measurements, 'targets': self.targets},
+                handle,
+                indent=2,
+            )
 
 _collector = _Collector()
 
@@ -68,7 +79,29 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=None,
         help="only run benchmarks whose name matches this expression",
     )
+    parser.add_argument(
+        "--e2e",
+        action="store_true",
+        help="run the spec 09 section 8 end-to-end targets instead of the primitives",
+    )
+    parser.add_argument(
+        "--scale",
+        choices=("smoke", "full"),
+        default="full",
+        help="size class for the end-to-end targets (default: full, the spec size)",
+    )
     args = parser.parse_args(argv)
+
+    if args.e2e:
+        pytest_target = "tests/perf/test_end_to_end.py"
+        report_kind = "targets"
+        document = ROOT / "docs" / "perf-e2e-results.md"
+        extra_env = {"TRIAGELENS_PERF_E2E": "1", "TRIAGELENS_PERF_SCALE": args.scale}
+    else:
+        pytest_target = "tests/perf"
+        report_kind = "measurements"
+        document = ROOT / "docs" / "perf-results.md"
+        extra_env = {}
 
     # A temp plugin file: pytest -p takes an importable module name, and adding a
     # permanent conftest hook for a rarely used run would slow every test run.
@@ -81,7 +114,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             sys.executable,
             "-m",
             "pytest",
-            "tests/perf",
+            pytest_target,
             "-q",
             "-p",
             "perf_collector",
@@ -92,13 +125,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.filter:
             command += ["-k", args.filter]
 
-        environment = {"PYTHONPATH": directory}
-        import os
-
         completed = subprocess.run(
             command,
             cwd=str(BACKEND),
-            env={**os.environ, **environment},
+            env={**os.environ, "PYTHONPATH": directory, **extra_env},
             check=False,
         )
         if completed.returncode != 0:
@@ -112,8 +142,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 sys.executable,
                 str(ROOT / "scripts" / "perf_report.py"),
                 str(results_path),
+                "--kind",
+                report_kind,
                 "--out",
-                str(ROOT / "docs" / "perf-results.md"),
+                str(document),
             ],
             cwd=str(ROOT),
             check=False,
