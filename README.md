@@ -25,7 +25,7 @@ deviations from the specs. The specifications being built against live in
 
 A short product teaser:
 
-![](https://github.com/user-attachments/assets/c88eb143-44db-4c8c-8729-19f7326b9090)
+https://github.com/user-attachments/assets/c88eb143-44db-4c8c-8729-19f7326b9090
 
 ## Requirements
 
