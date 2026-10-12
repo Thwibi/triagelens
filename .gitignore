@@ -38,6 +38,9 @@ backend/data/cases/
 backend/data/reports/
 backend/data/imports/
 backend/data/custom_rules/
+
+# Operator-supplied ATT&CK STIX bundle (tens of MB; loaded via Settings -> ATT&CK).
+backend/data/attack/*.json
 /data/
 
 # Local configuration and secrets
