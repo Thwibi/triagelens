@@ -41,7 +41,7 @@ environment are in `docs/COMPLIANCE.md`; the open gaps are listed below.
 
 | Gate | Command | Result |
 |---|---|---|
-| Backend lint | `.venv\Scripts\python.exe scripts\task.py backend-lint` | clean (ruff check + format check, 196 files) |
+| Backend lint | `.venv\Scripts\python.exe scripts\task.py backend-lint` | clean (ruff check + format check, 197 files) |
 | Backend types | `.venv\Scripts\python.exe scripts\task.py backend-typecheck` | clean (mypy, 211 source files) |
 | Backend tests | `.venv\Scripts\python.exe scripts\task.py backend-test` | 1818 passed, 1 skipped |
 | Backend coverage | `.venv\Scripts\python.exe scripts\task.py backend-coverage` | 89.56% overall (80% floor met); `parsers` 88%, `detect` 92%, `ioc` 93%, `mitre` 94% — all four spec 00 packages ≥ 85% (vendored `evtxlib/` omitted, as from ruff/mypy) |
